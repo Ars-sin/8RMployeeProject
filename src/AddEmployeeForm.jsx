@@ -84,7 +84,7 @@ const AddEmployeeForm = ({ onClose, onSave }) => {
                 {/* Full Name */}
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Full Name
+                    Full Name sssss
                   </label>
                   <div className="relative">
                     <input
