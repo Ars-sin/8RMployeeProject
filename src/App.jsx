@@ -1,9 +1,15 @@
 import React, { useState } from 'react';
 import { Mail, Lock, Eye, EyeOff, CheckCircle2 } from 'lucide-react';
 import EmployeesDashboard from './EmployeesDashboard';
+import HRDashboard from './HRDashboard';
+import AccountingDashboard from './AccountingDashboard';
+import { sendOTP, verifyOTP } from './OTPService';
+import { loginUser } from './services/authService';
 
 const BRMSystem = () => {
   const [currentView, setCurrentView] = useState('login'); // 'login', 'verification', 'dashboard'
+  const [dashboardType, setDashboardType] = useState('employee'); // 'employee', 'hr', 'accounting'
+  const [loggedInUser, setLoggedInUser] = useState(null);
   const [formData, setFormData] = useState({
     email: '',
     password: '',
@@ -39,9 +45,9 @@ const BRMSystem = () => {
     }
     
     if (!formData.password) {
-      newErrors.password = 'Password is required';
-    } else if (formData.password.length < 6) {
-      newErrors.password = 'Password must be at least 6 characters';
+      newErrors.password = 'Password or Employee ID is required';
+    } else if (formData.password.length < 3) {
+      newErrors.password = 'Must be at least 3 characters';
     }
     
     setErrors(newErrors);
@@ -61,44 +67,90 @@ const BRMSystem = () => {
     return Object.keys(newErrors).length === 0;
   };
 
-  const handleLogin = (e) => {
+  const handleLogin = async (e) => {
     e.preventDefault();
     
     if (validateLogin()) {
       setIsLoading(true);
-      // Simulate API call
-      setTimeout(() => {
+      
+      // Verify credentials (admin or employee)
+      const loginResult = await loginUser(formData.email, formData.password);
+      
+      if (loginResult.success) {
+        // Send OTP to user's email
+        const otpResult = await sendOTP(formData.email);
+        
+        if (otpResult.success) {
+          setLoggedInUser(loginResult.user);
+          setDashboardType(loginResult.dashboardType);
+          setIsLoading(false);
+          setCurrentView('verification');
+        } else {
+          setIsLoading(false);
+          setErrors({ email: otpResult.message || 'Failed to send OTP' });
+        }
+      } else {
         setIsLoading(false);
-        setCurrentView('verification');
-      }, 1500);
+        setErrors({ password: loginResult.message || 'Invalid credentials' });
+      }
     }
   };
 
-  const handleVerification = (e) => {
+  const handleVerification = async (e) => {
     e.preventDefault();
     
     if (validateVerification()) {
       setIsLoading(true);
-      // Simulate API call
-      setTimeout(() => {
+      
+      // Verify OTP with backend
+      const result = await verifyOTP(formData.email, formData.verificationCode);
+      
+      if (result.success) {
         setIsLoading(false);
-        setCurrentView('dashboard'); // Navigate to dashboard
-      }, 1500);
+        setCurrentView('dashboard');
+      } else {
+        setIsLoading(false);
+        setErrors({ verificationCode: result.message || 'Invalid OTP' });
+      }
     }
   };
 
-  const handleResendCode = () => {
+  const handleLogout = () => {
+    setCurrentView('login');
+    setLoggedInUser(null);
+    setDashboardType('employee');
+    setFormData({
+      email: '',
+      password: '',
+      verificationCode: '',
+      rememberMe: false
+    });
+    setErrors({});
+  };
+
+  const handleResendCode = async () => {
     setIsLoading(true);
-    setTimeout(() => {
+    
+    // Resend OTP
+    const result = await sendOTP(formData.email);
+    
+    if (result.success) {
       setIsLoading(false);
       alert('Verification code resent to your email!');
-    }, 1000);
+    } else {
+      setIsLoading(false);
+      alert('Failed to resend code. Please try again.');
+    }
   };
 
   return (
     <>
       {currentView === 'dashboard' ? (
-        <EmployeesDashboard onLogout={() => setCurrentView('login')} />
+        <>
+          {dashboardType === 'hr' && <HRDashboard user={loggedInUser} onLogout={handleLogout} />}
+          {dashboardType === 'accounting' && <AccountingDashboard user={loggedInUser} onLogout={handleLogout} />}
+          {dashboardType === 'employee' && <EmployeesDashboard onLogout={handleLogout} />}
+        </>
       ) : (
     <div className="min-h-screen flex">
       {/* Left Panel - Form */}
@@ -154,10 +206,10 @@ const BRMSystem = () => {
                   )}
                 </div>
 
-                {/* Password Input */}
+                {/* Password / Employee ID Input */}
                 <div>
                   <label className="block text-sm font-medium text-gray-900 mb-2">
-                    Password
+                    Password / Employee ID
                   </label>
                   <div className="relative">
                     <input
@@ -165,7 +217,7 @@ const BRMSystem = () => {
                       name="password"
                       value={formData.password}
                       onChange={handleInputChange}
-                      placeholder="Input password"
+                      placeholder="Enter password or Employee ID"
                       className={`w-full px-4 py-3 pr-12 border-2 rounded-lg focus:outline-none focus:border-blue-500 transition-colors ${
                         errors.password ? 'border-red-500' : 'border-gray-300'
                       }`}
