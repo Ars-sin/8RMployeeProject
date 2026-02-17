@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { X, Copy, Calendar, Upload, Settings } from 'lucide-react';
-import ArrangementModal from './ArrangementModal';
+import ArrangementModal from '../../ArrangementModal';
 
 const EmployeeDetailsView = ({ employee, onClose, onSave }) => {
   const [showArrangementModal, setShowArrangementModal] = useState(false);

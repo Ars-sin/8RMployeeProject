@@ -1,78 +1,39 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Search, Filter, Download, Plus, Edit2, Trash2, Menu, X, Archive, ClipboardList } from 'lucide-react';
-import ArchivedPage from './ArchivedPage';
-import ChangeLogsPage from './ChangeLogsPage';
-import AddEmployeeForm from './AddEmployeeForm';
-import EmployeeDetailsView from './EmployeeDetailsView';
+import ArchivedPage from '../HR/ArchivedPage';
+import ChangeLogsPage from '../HR/ChangeLogsPage';
+import AddEmployeeForm from '../HR/AddEmployeeForm';
+import EmployeeDetailsView from '../HR/EmployeeDetailsView';
+import { getEmployees } from '../../services/employeeService';
 
-const EmployeesDashboard = () => {
+const AdminDashboard = ({ onLogout }) => {
   const [selectedEmployees, setSelectedEmployees] = useState([]);
   const [searchQuery, setSearchQuery] = useState('');
   const [currentPage, setCurrentPage] = useState(1);
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [currentView, setCurrentView] = useState('employees'); // 'employees', 'archived', 'changelogs'
   const [showAddEmployee, setShowAddEmployee] = useState(false);
+  const [editingEmployee, setEditingEmployee] = useState(null);
   const [selectedEmployee, setSelectedEmployee] = useState(null);
+  const [employees, setEmployees] = useState([]);
+  const [loading, setLoading] = useState(true);
 
-  // Sample employee data
-  const [employees, setEmployees] = useState([
-    {
-      id: 'EMP-2026-04719',
-      name: 'Charles Ambrad',
-      contact: 'Assistant@example.com',
-      phone: '+62 819 1514 1435',
-      position: 'Assistant',
-      address: 'Unit 4B, Palm Crest Residences, 78 Lapu-Lapu Street, Barangay Lahug, Cebu City, 6000, Philippines'
-    },
-    {
-      id: 'EMP-2026-04719',
-      name: 'Horry Bella',
-      contact: 'Assistant@example.com',
-      phone: '+62 819 1514 1435',
-      position: 'Assistant',
-      address: 'Unit 4B, Palm Crest Residences, 78 Lapu-Lapu Street, Barangay Lahug, Cebu City, 6000, Philippines'
-    },
-    {
-      id: 'EMP-2026-04719',
-      name: 'Mary Caneda',
-      contact: 'Assistant@example.com',
-      phone: '+62 819 1514 1435',
-      position: 'Assistant',
-      address: 'Unit 4B, Palm Crest Residences, 78 Lapu-Lapu Street, Barangay Lahug, Cebu City, 6000, Philippines'
-    },
-    {
-      id: 'EMP-2026-04719',
-      name: 'Sean Jerez',
-      contact: 'Assistant@example.com',
-      phone: '+62 819 1514 1435',
-      position: 'Assistant',
-      address: 'Unit 4B, Palm Crest Residences, 78 Lapu-Lapu Street, Barangay Lahug, Cebu City, 6000, Philippines'
-    },
-    {
-      id: 'EMP-2026-04719',
-      name: 'Laurence Monaris',
-      contact: 'Assistant@example.com',
-      phone: '+62 819 1514 1435',
-      position: 'Assistant',
-      address: 'Unit 4B, Palm Crest Residences, 78 Lapu-Lapu Street, Barangay Lahug, Cebu City, 6000, Philippines'
-    },
-    {
-      id: 'EMP-2026-04719',
-      name: 'Charles Ambrad',
-      contact: 'Assistant@example.com',
-      phone: '+62 819 1514 1435',
-      position: 'Assistant',
-      address: 'Unit 4B, Palm Crest Residences, 78 Lapu-Lapu Street, Barangay Lahug, Cebu City, 6000, Philippines'
-    },
-    {
-      id: 'EMP-2026-04719',
-      name: 'Horry Bella',
-      contact: 'Assistant@example.com',
-      phone: '+62 819 1514 1435',
-      position: 'Assistant',
-      address: 'Unit 4B, Palm Crest Residences, 78 Lapu-Lapu Street, Barangay Lahug, Cebu City, 6000, Philippines'
-    }
-  ]);
+  // Load employees from Firebase on mount
+  useEffect(() => {
+    const loadEmployees = async () => {
+      try {
+        const employeeData = await getEmployees();
+        setEmployees(employeeData);
+      } catch (error) {
+        console.error('Error loading employees:', error);
+      } finally {
+        setLoading(false);
+      }
+    };
+    
+    loadEmployees();
+  }, []);
+
 
   const handleSelectEmployee = (id) => {
     setSelectedEmployees(prev => 
@@ -90,9 +51,19 @@ const EmployeesDashboard = () => {
     }
   };
 
-  const handleDelete = (id) => {
-    if (window.confirm('Are you sure you want to delete this employee?')) {
-      setEmployees(employees.filter(emp => emp.id !== id));
+  const handleDelete = async (id) => {
+    if (window.confirm('Are you sure you want to archive this employee?')) {
+      try {
+        const { archiveEmployee } = await import('../../services/employeeService');
+        await archiveEmployee(id);
+        
+        // Remove from current list
+        setEmployees(employees.filter(emp => emp.id !== id));
+        alert('Employee archived successfully');
+      } catch (error) {
+        console.error('Error archiving employee:', error);
+        alert('Failed to archive employee. Please try again.');
+      }
     }
   };
 
@@ -104,26 +75,65 @@ const EmployeesDashboard = () => {
     setShowAddEmployee(true);
   };
 
-  const handleSaveEmployee = (employeeData) => {
-    // Add the new employee to the list
-    setEmployees([...employees, employeeData]);
+  const handleSaveEmployee = async (employeeData) => {
+    try {
+      if (editingEmployee) {
+        // Update existing employee
+        const { updateEmployee } = await import('../../services/employeeService');
+        const updatedEmployee = await updateEmployee(
+          editingEmployee.id, 
+          employeeData, 
+          employeeData.softCopy
+        );
+        
+        // Update local state
+        setEmployees(employees.map(emp => 
+          emp.id === editingEmployee.id ? { ...emp, ...updatedEmployee } : emp
+        ));
+        setEditingEmployee(null);
+      } else {
+        // Add new employee
+        const { addEmployee } = await import('../../services/employeeService');
+        const newEmployee = await addEmployee(employeeData, employeeData.softCopy);
+        
+        // Update local state
+        setEmployees([...employees, newEmployee]);
+      }
+      setShowAddEmployee(false);
+    } catch (error) {
+      console.error('Error saving employee:', error);
+      alert('Failed to save employee. Please try again.');
+    }
+  };
+
+  const handleEditEmployee = (employee) => {
+    setEditingEmployee(employee);
+    setShowAddEmployee(true);
+  };
+
+  const handleCloseForm = () => {
     setShowAddEmployee(false);
+    setEditingEmployee(null);
   };
 
   const filteredEmployees = employees.filter(emp =>
-    emp.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    emp.id.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    emp.contact.toLowerCase().includes(searchQuery.toLowerCase())
+    (emp.name?.toLowerCase() || '').includes(searchQuery.toLowerCase()) ||
+    (emp.fullName?.toLowerCase() || '').includes(searchQuery.toLowerCase()) ||
+    (emp.id?.toLowerCase() || '').includes(searchQuery.toLowerCase()) ||
+    (emp.employmentId?.toLowerCase() || '').includes(searchQuery.toLowerCase()) ||
+    (emp.contact?.toLowerCase() || '').includes(searchQuery.toLowerCase()) ||
+    (emp.email?.toLowerCase() || '').includes(searchQuery.toLowerCase())
   );
 
   const totalPages = 13; // Based on "1 - 10 of 13 Pages" in the design
 
   return (
     <div className="flex h-screen bg-gray-50 gap-0">
-      {/* Add Employee Modal */}
+      {/* Add/Edit Employee Modal */}
       {showAddEmployee && (
         <AddEmployeeForm 
-          onClose={() => setShowAddEmployee(false)}
+          employee={editingEmployee}
+          onClose={handleCloseForm}
           onSave={handleSaveEmployee}
         />
       )}
@@ -206,7 +216,10 @@ const EmployeesDashboard = () => {
 
         {/* Logout Button */}
         <div className="p-6">
-          <button className="w-full flex items-center justify-center gap-2 px-4 py-3 bg-blue-600 text-white rounded-lg font-semibold hover:bg-blue-700 transition-colors shadow-sm">
+          <button 
+            onClick={onLogout}
+            className="w-full flex items-center justify-center gap-2 px-4 py-3 bg-blue-600 text-white rounded-lg font-semibold hover:bg-blue-700 transition-colors shadow-sm"
+          >
             <svg width="20" height="20" viewBox="0 0 20 20" fill="currentColor">
               <path fillRule="evenodd" d="M3 3a1 1 0 011 1v12a1 1 0 11-2 0V4a1 1 0 011-1zm7.707 3.293a1 1 0 010 1.414L9.414 9H17a1 1 0 110 2H9.414l1.293 1.293a1 1 0 01-1.414 1.414l-3-3a1 1 0 010-1.414l3-3a1 1 0 011.414 0z" clipRule="evenodd"/>
             </svg>
@@ -344,19 +357,21 @@ const EmployeesDashboard = () => {
                       </td>
                       <td className="px-6 py-4">
                         <div>
-                          <div className="text-sm font-semibold text-blue-600 mb-0.5">{employee.id}</div>
+                          <div className="text-sm font-semibold text-blue-600 mb-0.5">
+                            {employee.employmentId || 'N/A'}
+                          </div>
                           <button 
                             onClick={() => setSelectedEmployee(employee)}
                             className="text-sm text-gray-900 font-medium hover:text-blue-600 transition-colors text-left"
                           >
-                            {employee.name}
+                            {employee.fullName || employee.name || 'No Name'}
                           </button>
                         </div>
                       </td>
                       <td className="px-6 py-4">
                         <div>
-                          <div className="text-sm text-gray-900">{employee.contact}</div>
-                          <div className="text-sm text-gray-500">{employee.phone}</div>
+                          <div className="text-sm text-gray-900">{employee.email || 'N/A'}</div>
+                          <div className="text-sm text-gray-500">{employee.contact || 'N/A'}</div>
                         </div>
                       </td>
                       <td className="px-6 py-4">
@@ -367,7 +382,10 @@ const EmployeesDashboard = () => {
                       </td>
                       <td className="px-6 py-4">
                         <div className="flex items-center gap-3">
-                          <button className="p-1.5 hover:bg-gray-100 rounded transition-colors">
+                          <button 
+                            onClick={() => handleEditEmployee(employee)}
+                            className="p-1.5 hover:bg-gray-100 rounded transition-colors"
+                          >
                             <Edit2 className="w-4 h-4 text-gray-500" />
                           </button>
                           <button 
@@ -425,4 +443,4 @@ const EmployeesDashboard = () => {
   );
 };
 
-export default EmployeesDashboard;
+export default AdminDashboard;

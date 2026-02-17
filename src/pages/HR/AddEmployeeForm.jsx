@@ -1,7 +1,7 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { X, Upload, Calendar, Copy } from 'lucide-react';
 
-const AddEmployeeForm = ({ onClose, onSave }) => {
+const AddEmployeeForm = ({ employee, onClose, onSave }) => {
   const [formData, setFormData] = useState({
     // Personal Information
     fullName: '',
@@ -33,6 +33,35 @@ const AddEmployeeForm = ({ onClose, onSave }) => {
     softCopy: null
   });
 
+  // Populate form when editing
+  useEffect(() => {
+    if (employee) {
+      setFormData({
+        fullName: employee.fullName || '',
+        email: employee.email || '',
+        address: employee.address || '',
+        dateOfBirth: employee.dateOfBirth || '',
+        contact: employee.contact || '',
+        emergencyContact: employee.emergencyContact || '',
+        emergencyContactName: employee.emergencyContactName || '',
+        salary: employee.salary || '',
+        bankNumber: employee.bankNumber || '',
+        sickLeave: employee.sickLeave || '10',
+        sssNumber: employee.sssNumber || '',
+        vacationHours: employee.vacationHours || '50',
+        philhealthSin: employee.philhealthSin || '',
+        pagIbigMidNumber: employee.pagIbigMidNumber || '',
+        employmentId: employee.employmentId || '',
+        assignArea: employee.assignArea || '',
+        position: employee.position || '',
+        status: employee.status || '',
+        contractStartDate: employee.contractStartDate || '',
+        contractEndDate: employee.contractEndDate || '',
+        softCopy: null
+      });
+    }
+  }, [employee]);
+
   const handleInputChange = (e) => {
     const { name, value } = e.target;
     setFormData(prev => ({
@@ -63,7 +92,9 @@ const AddEmployeeForm = ({ onClose, onSave }) => {
       <div className="bg-white rounded-lg shadow-xl w-full max-w-3xl max-h-[90vh] overflow-hidden flex flex-col">
         {/* Header */}
         <div className="px-6 py-4 border-b border-gray-200 flex items-center justify-between">
-          <h2 className="text-xl font-semibold text-gray-900">Employee</h2>
+          <h2 className="text-xl font-semibold text-gray-900">
+            {employee ? 'Edit Employee' : 'Add Employee'}
+          </h2>
           <button 
             onClick={onClose}
             className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
@@ -521,7 +552,7 @@ const AddEmployeeForm = ({ onClose, onSave }) => {
               type="submit"
               className="px-6 py-2.5 bg-blue-600 text-white rounded-lg font-semibold hover:bg-blue-700 transition-colors"
             >
-              Add Employee
+              {employee ? 'Update Employee' : 'Add Employee'}
             </button>
           </div>
         </form>
