@@ -1,8 +1,8 @@
 import React, { useState } from 'react';
 import { Mail, Lock, Eye, EyeOff, CheckCircle2 } from 'lucide-react';
-import EmployeesDashboard from './EmployeesDashboard';
-import HRDashboard from './HRDashboard';
-import AccountingDashboard from './AccountingDashboard';
+import AdminDashboard from './pages/Admin/AdminDashboard';
+import HRDashboard from './pages/HR/HRDashboard';
+import AccountingDashboard from './pages/Accounting/AccountingDashboard';
 import { sendOTP, verifyOTP } from './OTPService';
 import { loginUser } from './services/authService';
 
@@ -149,7 +149,7 @@ const BRMSystem = () => {
         <>
           {dashboardType === 'hr' && <HRDashboard user={loggedInUser} onLogout={handleLogout} />}
           {dashboardType === 'accounting' && <AccountingDashboard user={loggedInUser} onLogout={handleLogout} />}
-          {dashboardType === 'employee' && <EmployeesDashboard onLogout={handleLogout} />}
+          {dashboardType === 'employee' && <AdminDashboard onLogout={handleLogout} />}
         </>
       ) : (
     <div className="min-h-screen flex">

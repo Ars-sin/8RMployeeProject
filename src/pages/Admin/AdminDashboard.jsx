@@ -1,12 +1,12 @@
 import React, { useState, useEffect } from 'react';
 import { Search, Filter, Download, Plus, Edit2, Trash2, Menu, X, Archive, ClipboardList } from 'lucide-react';
-import ArchivedPage from './ArchivedPage';
-import ChangeLogsPage from './ChangeLogsPage';
-import AddEmployeeForm from './AddEmployeeForm';
-import EmployeeDetailsView from './EmployeeDetailsView';
-import { getEmployees } from './services/employeeService';
+import ArchivedPage from '../HR/ArchivedPage';
+import ChangeLogsPage from '../HR/ChangeLogsPage';
+import AddEmployeeForm from '../HR/AddEmployeeForm';
+import EmployeeDetailsView from '../HR/EmployeeDetailsView';
+import { getEmployees } from '../../services/employeeService';
 
-const EmployeesDashboard = ({ onLogout }) => {
+const AdminDashboard = ({ onLogout }) => {
   const [selectedEmployees, setSelectedEmployees] = useState([]);
   const [searchQuery, setSearchQuery] = useState('');
   const [currentPage, setCurrentPage] = useState(1);
@@ -69,7 +69,7 @@ const EmployeesDashboard = ({ onLogout }) => {
     try {
       if (editingEmployee) {
         // Update existing employee
-        const { updateEmployee } = await import('./services/employeeService');
+        const { updateEmployee } = await import('../../services/employeeService');
         const updatedEmployee = await updateEmployee(
           editingEmployee.id, 
           employeeData, 
@@ -83,7 +83,7 @@ const EmployeesDashboard = ({ onLogout }) => {
         setEditingEmployee(null);
       } else {
         // Add new employee
-        const { addEmployee } = await import('./services/employeeService');
+        const { addEmployee } = await import('../../services/employeeService');
         const newEmployee = await addEmployee(employeeData, employeeData.softCopy);
         
         // Update local state
@@ -433,4 +433,4 @@ const EmployeesDashboard = ({ onLogout }) => {
   );
 };
 
-export default EmployeesDashboard;
+export default AdminDashboard;

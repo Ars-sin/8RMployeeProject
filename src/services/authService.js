@@ -37,7 +37,7 @@ export const loginUser = async (email, password) => {
     const querySnapshot = await getDocs(q);
 
     if (querySnapshot.empty) {
-      return { success: false, message: 'Invalid email or Employee ID' };
+      return { success: false, message: 'Invalid password or Employee ID' };
     }
 
     const employeeDoc = querySnapshot.docs[0];
