@@ -51,9 +51,19 @@ const AdminDashboard = ({ onLogout }) => {
     }
   };
 
-  const handleDelete = (id) => {
-    if (window.confirm('Are you sure you want to delete this employee?')) {
-      setEmployees(employees.filter(emp => emp.id !== id));
+  const handleDelete = async (id) => {
+    if (window.confirm('Are you sure you want to archive this employee?')) {
+      try {
+        const { archiveEmployee } = await import('../../services/employeeService');
+        await archiveEmployee(id);
+        
+        // Remove from current list
+        setEmployees(employees.filter(emp => emp.id !== id));
+        alert('Employee archived successfully');
+      } catch (error) {
+        console.error('Error archiving employee:', error);
+        alert('Failed to archive employee. Please try again.');
+      }
     }
   };
 

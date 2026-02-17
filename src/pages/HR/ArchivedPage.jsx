@@ -1,70 +1,56 @@
-import React, { useState } from 'react';
-import { Search, Filter, Download, Menu, Edit2, Trash2 } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { Search, Filter, Download, Menu, RotateCcw, Trash2 } from 'lucide-react';
+import { getEmployees, restoreEmployee, deleteEmployee } from '../../services/employeeService';
 
 const ArchivedPage = ({ onNavigate }) => {
   const [selectedEmployees, setSelectedEmployees] = useState([]);
   const [searchQuery, setSearchQuery] = useState('');
   const [currentPage, setCurrentPage] = useState(1);
+  const [archivedEmployees, setArchivedEmployees] = useState([]);
+  const [loading, setLoading] = useState(true);
 
-  // Sample archived employee data
-  const [archivedEmployees, setArchivedEmployees] = useState([
-    {
-      id: 'EMP-2026-04719',
-      name: 'Charles Ambrad',
-      contact: 'Assistant@example.com',
-      phone: '+62 819 1514 1435',
-      position: 'Assistant',
-      address: 'Unit 4B, Palm Crest Residences, 78 Lapu-Lapu Street, Barangay Lahug, Cebu City, 6000, Philippines'
-    },
-    {
-      id: 'EMP-2026-04719',
-      name: 'Horry Bella',
-      contact: 'Assistant@example.com',
-      phone: '+62 819 1514 1435',
-      position: 'Assistant',
-      address: 'Unit 4B, Palm Crest Residences, 78 Lapu-Lapu Street, Barangay Lahug, Cebu City, 6000, Philippines'
-    },
-    {
-      id: 'EMP-2026-04719',
-      name: 'Mary Caneda',
-      contact: 'Assistant@example.com',
-      phone: '+62 819 1514 1435',
-      position: 'Assistant',
-      address: 'Unit 4B, Palm Crest Residences, 78 Lapu-Lapu Street, Barangay Lahug, Cebu City, 6000, Philippines'
-    },
-    {
-      id: 'EMP-2026-04719',
-      name: 'Sean Jerez',
-      contact: 'Assistant@example.com',
-      phone: '+62 819 1514 1435',
-      position: 'Assistant',
-      address: 'Unit 4B, Palm Crest Residences, 78 Lapu-Lapu Street, Barangay Lahug, Cebu City, 6000, Philippines'
-    },
-    {
-      id: 'EMP-2026-04719',
-      name: 'Laurence Monaris',
-      contact: 'Assistant@example.com',
-      phone: '+62 819 1514 1435',
-      position: 'Assistant',
-      address: 'Unit 4B, Palm Crest Residences, 78 Lapu-Lapu Street, Barangay Lahug, Cebu City, 6000, Philippines'
-    },
-    {
-      id: 'EMP-2026-04719',
-      name: 'Charles Ambrad',
-      contact: 'Assistant@example.com',
-      phone: '+62 819 1514 1435',
-      position: 'Assistant',
-      address: 'Unit 4B, Palm Crest Residences, 78 Lapu-Lapu Street, Barangay Lahug, Cebu City, 6000, Philippines'
-    },
-    {
-      id: 'EMP-2026-04719',
-      name: 'Horry Bella',
-      contact: 'Assistant@example.com',
-      phone: '+62 819 1514 1435',
-      position: 'Assistant',
-      address: 'Unit 4B, Palm Crest Residences, 78 Lapu-Lapu Street, Barangay Lahug, Cebu City, 6000, Philippines'
+  // Load archived employees from Firebase
+  useEffect(() => {
+    const loadArchivedEmployees = async () => {
+      try {
+        const allEmployees = await getEmployees(true); // Include archived
+        const archived = allEmployees.filter(emp => emp.isArchived);
+        setArchivedEmployees(archived);
+      } catch (error) {
+        console.error('Error loading archived employees:', error);
+      } finally {
+        setLoading(false);
+      }
+    };
+    
+    loadArchivedEmployees();
+  }, []);
+
+  const handleRestore = async (id) => {
+    if (window.confirm('Are you sure you want to restore this employee?')) {
+      try {
+        await restoreEmployee(id);
+        setArchivedEmployees(archivedEmployees.filter(emp => emp.id !== id));
+        alert('Employee restored successfully');
+      } catch (error) {
+        console.error('Error restoring employee:', error);
+        alert('Failed to restore employee. Please try again.');
+      }
     }
-  ]);
+  };
+
+  const handlePermanentDelete = async (id) => {
+    if (window.confirm('⚠️ WARNING: This will permanently delete the employee from the database. This action cannot be undone. Are you sure?')) {
+      try {
+        await deleteEmployee(id);
+        setArchivedEmployees(archivedEmployees.filter(emp => emp.id !== id));
+        alert('Employee permanently deleted');
+      } catch (error) {
+        console.error('Error deleting employee:', error);
+        alert('Failed to delete employee. Please try again.');
+      }
+    }
+  };
 
   const handleSelectEmployee = (id) => {
     setSelectedEmployees(prev => 
@@ -82,27 +68,17 @@ const ArchivedPage = ({ onNavigate }) => {
     }
   };
 
-  const handleRestore = (id) => {
-    if (window.confirm('Are you sure you want to restore this employee?')) {
-      setArchivedEmployees(archivedEmployees.filter(emp => emp.id !== id));
-      alert('Employee restored successfully!');
-    }
-  };
-
-  const handleDelete = (id) => {
-    if (window.confirm('Are you sure you want to permanently delete this employee?')) {
-      setArchivedEmployees(archivedEmployees.filter(emp => emp.id !== id));
-    }
-  };
-
   const handleExport = () => {
     alert('Exporting archived employee data...');
   };
 
   const filteredEmployees = archivedEmployees.filter(emp =>
-    emp.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    emp.id.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    emp.contact.toLowerCase().includes(searchQuery.toLowerCase())
+    (emp.name?.toLowerCase() || '').includes(searchQuery.toLowerCase()) ||
+    (emp.fullName?.toLowerCase() || '').includes(searchQuery.toLowerCase()) ||
+    (emp.id?.toLowerCase() || '').includes(searchQuery.toLowerCase()) ||
+    (emp.employmentId?.toLowerCase() || '').includes(searchQuery.toLowerCase()) ||
+    (emp.contact?.toLowerCase() || '').includes(searchQuery.toLowerCase()) ||
+    (emp.email?.toLowerCase() || '').includes(searchQuery.toLowerCase())
   );
 
   const totalPages = 13;
@@ -202,7 +178,7 @@ const ArchivedPage = ({ onNavigate }) => {
               </thead>
               <tbody>
                 {filteredEmployees.map((employee, index) => (
-                  <tr key={index} className="border-b border-gray-100 hover:bg-gray-50 transition-colors">
+                  <tr key={employee.id || index} className="border-b border-gray-100 hover:bg-gray-50 transition-colors">
                     <td className="px-6 py-4">
                       <input
                         type="checkbox"
@@ -213,18 +189,22 @@ const ArchivedPage = ({ onNavigate }) => {
                     </td>
                     <td className="px-6 py-4">
                       <div>
-                        <div className="text-sm font-semibold text-blue-600 mb-0.5">{employee.id}</div>
-                        <div className="text-sm text-gray-900 font-medium">{employee.name}</div>
+                        <div className="text-sm font-semibold text-blue-600 mb-0.5">
+                          {employee.employmentId || 'N/A'}
+                        </div>
+                        <div className="text-sm text-gray-900 font-medium">
+                          {employee.fullName || employee.name || 'No Name'}
+                        </div>
                       </div>
                     </td>
                     <td className="px-6 py-4">
                       <div>
-                        <div className="text-sm text-gray-900">{employee.contact}</div>
-                        <div className="text-sm text-gray-500">{employee.phone}</div>
+                        <div className="text-sm text-gray-900">{employee.email || 'N/A'}</div>
+                        <div className="text-sm text-gray-500">{employee.contact || 'N/A'}</div>
                       </div>
                     </td>
                     <td className="px-6 py-4">
-                      <span className="text-sm text-gray-700">{employee.position}</span>
+                      <span className="text-sm text-gray-700">{employee.position || 'N/A'}</span>
                     </td>
                     <td className="px-6 py-4">
                       <span className="text-sm text-gray-600 leading-relaxed">{employee.address}</span>
@@ -233,17 +213,15 @@ const ArchivedPage = ({ onNavigate }) => {
                       <div className="flex items-center gap-3">
                         <button 
                           onClick={() => handleRestore(employee.id)}
-                          className="p-1.5 hover:bg-blue-50 rounded transition-colors"
-                          title="Restore"
+                          className="p-1.5 hover:bg-green-50 rounded transition-colors"
+                          title="Restore Employee"
                         >
-                          <svg className="w-4 h-4 text-gray-500 hover:text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-                          </svg>
+                          <RotateCcw className="w-4 h-4 text-gray-500 hover:text-green-600" />
                         </button>
                         <button 
-                          onClick={() => handleDelete(employee.id)}
+                          onClick={() => handlePermanentDelete(employee.id)}
                           className="p-1.5 hover:bg-red-50 rounded transition-colors"
-                          title="Delete Permanently"
+                          title="Delete Permanently (Cannot be undone)"
                         >
                           <Trash2 className="w-4 h-4 text-gray-500 hover:text-red-600" />
                         </button>

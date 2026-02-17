@@ -1,77 +1,65 @@
-import React, { useState } from 'react';
-import { Search, Filter, Download, Menu } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { Search, Filter, Download, RefreshCw, Menu } from 'lucide-react';
+import { getChangeLogs, formatLogTimestamp } from '../../services/changeLogService';
 
 const ChangeLogsPage = ({ onNavigate }) => {
   const [selectedLogs, setSelectedLogs] = useState([]);
   const [searchQuery, setSearchQuery] = useState('');
   const [currentPage, setCurrentPage] = useState(1);
+  const [changeLogs, setChangeLogs] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [filterType, setFilterType] = useState('all');
 
-  // Sample change logs data
-  const [changeLogs, setChangeLogs] = useState([
-    {
-      id: 'EMP-2026-04719',
-      user: 'Charles Ambrad',
-      actionType: 'Employee Changes',
-      actionDetail: 'Personal Information',
-      timestamp: '8:20pm',
-      date: '09/02/2026',
-      description: 'Changes in contact details (phone number and address) 09923456789 to 09109876543Z1'
-    },
-    {
-      id: 'EMP-2026-04719',
-      user: 'Charles Ambrad',
-      actionType: 'Employee Changes',
-      actionDetail: 'Personal Information',
-      timestamp: '8:20pm',
-      date: '09/02/2026',
-      description: 'Changes in contact details (phone number and address) 09923456789 to 09109876543Z1'
-    },
-    {
-      id: 'EMP-2026-04719',
-      user: 'Charles Ambrad',
-      actionType: 'Employee Changes',
-      actionDetail: 'Personal Information',
-      timestamp: '8:20pm',
-      date: '09/02/2026',
-      description: 'Changes in contact details (phone number and address) 09923456789 to 09109876543Z1'
-    },
-    {
-      id: 'EMP-2026-04719',
-      user: 'Charles Ambrad',
-      actionType: 'Employee Changes',
-      actionDetail: 'Personal Information',
-      timestamp: '8:20pm',
-      date: '09/02/2026',
-      description: 'Changes in contact details (phone number and address) 09923456789 to 09109876543Z1'
-    },
-    {
-      id: 'EMP-2026-04719',
-      user: 'Charles Ambrad',
-      actionType: 'Employee Changes',
-      actionDetail: 'Personal Information',
-      timestamp: '8:20pm',
-      date: '09/02/2026',
-      description: 'Changes in contact details (phone number and address) 09923456789 to 09109876543Z1'
-    },
-    {
-      id: 'EMP-2026-04719',
-      user: 'Charles Ambrad',
-      actionType: 'Employee Changes',
-      actionDetail: 'Personal Information',
-      timestamp: '8:20pm',
-      date: '09/02/2026',
-      description: 'Changes in contact details (phone number and address) 09923456789 to 09109876543Z1'
-    },
-    {
-      id: 'EMP-2026-04719',
-      user: 'Charles Ambrad',
-      actionType: 'Employee Changes',
-      actionDetail: 'Personal Information',
-      timestamp: '8:20pm',
-      date: '09/02/2026',
-      description: 'Changes in contact details (phone number and address) 09923456789 to 09109876543Z1'
+  // Load change logs from Firebase
+  useEffect(() => {
+    loadChangeLogs();
+  }, []);
+
+  const loadChangeLogs = async () => {
+    try {
+      setLoading(true);
+      const logs = await getChangeLogs(200); // Get last 200 logs
+      setChangeLogs(logs);
+    } catch (error) {
+      console.error('Error loading change logs:', error);
+    } finally {
+      setLoading(false);
     }
-  ]);
+  };
+
+  const getActionColor = (type) => {
+    switch (type) {
+      case 'employee_added':
+        return 'text-green-600 bg-green-50';
+      case 'employee_updated':
+        return 'text-blue-600 bg-blue-50';
+      case 'employee_archived':
+        return 'text-orange-600 bg-orange-50';
+      case 'employee_restored':
+        return 'text-purple-600 bg-purple-50';
+      case 'employee_deleted':
+        return 'text-red-600 bg-red-50';
+      default:
+        return 'text-gray-600 bg-gray-50';
+    }
+  };
+
+  const getActionIcon = (type) => {
+    switch (type) {
+      case 'employee_added':
+        return '➕';
+      case 'employee_updated':
+        return '✏️';
+      case 'employee_archived':
+        return '📦';
+      case 'employee_restored':
+        return '↩️';
+      case 'employee_deleted':
+        return '🗑️';
+      default:
+        return '📝';
+    }
+  };
 
   const handleSelectLog = (id) => {
     setSelectedLogs(prev => 
@@ -85,7 +73,7 @@ const ChangeLogsPage = ({ onNavigate }) => {
     if (selectedLogs.length === changeLogs.length) {
       setSelectedLogs([]);
     } else {
-      setSelectedLogs(changeLogs.map((log, index) => index));
+      setSelectedLogs(changeLogs.map(log => log.id));
     }
   };
 
@@ -93,11 +81,17 @@ const ChangeLogsPage = ({ onNavigate }) => {
     alert('Exporting change logs data...');
   };
 
-  const filteredLogs = changeLogs.filter(log =>
-    log.user.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    log.id.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    log.actionType.toLowerCase().includes(searchQuery.toLowerCase())
-  );
+  const filteredLogs = changeLogs.filter(log => {
+    const matchesSearch = 
+      (log.employeeName?.toLowerCase() || '').includes(searchQuery.toLowerCase()) ||
+      (log.description?.toLowerCase() || '').includes(searchQuery.toLowerCase()) ||
+      (log.performedBy?.toLowerCase() || '').includes(searchQuery.toLowerCase()) ||
+      (log.action?.toLowerCase() || '').includes(searchQuery.toLowerCase());
+    
+    const matchesFilter = filterType === 'all' || log.type === filterType;
+    
+    return matchesSearch && matchesFilter;
+  });
 
   const totalPages = 13;
 
@@ -145,12 +139,26 @@ const ChangeLogsPage = ({ onNavigate }) => {
 
               {/* Action Buttons */}
               <div className="flex items-center gap-3">
-                <button 
-                  onClick={handleExport}
-                  className="flex items-center gap-2 px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 font-medium"
+                <select
+                  value={filterType}
+                  onChange={(e) => setFilterType(e.target.value)}
+                  className="px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
                 >
-                  <Filter className="w-4 h-4" />
-                  Filter
+                  <option value="all">All Actions</option>
+                  <option value="employee_added">Added</option>
+                  <option value="employee_updated">Updated</option>
+                  <option value="employee_archived">Archived</option>
+                  <option value="employee_restored">Restored</option>
+                  <option value="employee_deleted">Deleted</option>
+                </select>
+                
+                <button 
+                  onClick={loadChangeLogs}
+                  className="flex items-center gap-2 px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 font-medium"
+                  disabled={loading}
+                >
+                  <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
+                  Refresh
                 </button>
                 
                 <button 
@@ -192,39 +200,60 @@ const ChangeLogsPage = ({ onNavigate }) => {
                 </tr>
               </thead>
               <tbody>
-                {filteredLogs.map((log, index) => (
-                  <tr key={index} className="border-b border-gray-100 hover:bg-gray-50 transition-colors">
-                    <td className="px-6 py-4">
-                      <input
-                        type="checkbox"
-                        checked={selectedLogs.includes(index)}
-                        onChange={() => handleSelectLog(index)}
-                        className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
-                      />
-                    </td>
-                    <td className="px-6 py-4">
-                      <div>
-                        <div className="text-sm font-semibold text-blue-600 mb-0.5">{log.id}</div>
-                        <div className="text-sm text-gray-900 font-medium">{log.user}</div>
-                      </div>
-                    </td>
-                    <td className="px-6 py-4">
-                      <div>
-                        <div className="text-sm text-gray-900 font-medium">{log.actionType}</div>
-                        <div className="text-sm text-gray-600">{log.actionDetail}</div>
-                      </div>
-                    </td>
-                    <td className="px-6 py-4">
-                      <div>
-                        <div className="text-sm text-gray-900">{log.timestamp}</div>
-                        <div className="text-sm text-gray-500">{log.date}</div>
-                      </div>
-                    </td>
-                    <td className="px-6 py-4">
-                      <span className="text-sm text-gray-600 leading-relaxed">{log.description}</span>
+                {loading ? (
+                  <tr>
+                    <td colSpan="5" className="px-6 py-12 text-center text-gray-500">
+                      Loading change logs...
                     </td>
                   </tr>
-                ))}
+                ) : filteredLogs.length === 0 ? (
+                  <tr>
+                    <td colSpan="5" className="px-6 py-12 text-center text-gray-500">
+                      No change logs found
+                    </td>
+                  </tr>
+                ) : (
+                  filteredLogs.map((log, index) => (
+                    <tr key={log.id || index} className="border-b border-gray-100 hover:bg-gray-50 transition-colors">
+                      <td className="px-6 py-4">
+                        <input
+                          type="checkbox"
+                          checked={selectedLogs.includes(log.id)}
+                          onChange={() => handleSelectLog(log.id)}
+                          className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
+                        />
+                      </td>
+                      <td className="px-6 py-4">
+                        <div>
+                          <div className="text-sm font-semibold text-blue-600 mb-0.5">
+                            {log.employeeId || 'N/A'}
+                          </div>
+                          <div className="text-sm text-gray-900 font-medium">
+                            {log.employeeName || 'System'}
+                          </div>
+                        </div>
+                      </td>
+                      <td className="px-6 py-4">
+                        <div className="flex items-center gap-2">
+                          <span className={`px-3 py-1 rounded-full text-xs font-medium ${getActionColor(log.type)}`}>
+                            {getActionIcon(log.type)} {log.action}
+                          </span>
+                        </div>
+                        <div className="text-xs text-gray-600 mt-1">
+                          By: {log.performedBy}
+                        </div>
+                      </td>
+                      <td className="px-6 py-4">
+                        <div className="text-sm text-gray-900">
+                          {formatLogTimestamp(log.timestamp)}
+                        </div>
+                      </td>
+                      <td className="px-6 py-4">
+                        <span className="text-sm text-gray-600 leading-relaxed">{log.description}</span>
+                      </td>
+                    </tr>
+                  ))
+                )}
               </tbody>
             </table>
           </div>

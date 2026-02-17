@@ -12,6 +12,7 @@ import {
 } from 'firebase/firestore';
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import { db, storage } from '../firebase';
+import { addChangeLog, LOG_TYPES, createLogDescription } from './changeLogService';
 
 const EMPLOYEES_COLLECTION = 'employees';
 
@@ -36,7 +37,23 @@ export const addEmployee = async (employeeData, contractFile = null) => {
     };
 
     const docRef = await addDoc(collection(db, EMPLOYEES_COLLECTION), employeeDoc);
-    return { id: docRef.id, ...employeeDoc };
+    const newEmployee = { id: docRef.id, ...employeeDoc };
+    
+    // Log the activity
+    await addChangeLog({
+      type: LOG_TYPES.EMPLOYEE_ADDED,
+      action: 'Create',
+      description: createLogDescription(LOG_TYPES.EMPLOYEE_ADDED, employeeData.fullName),
+      employeeId: docRef.id,
+      employeeName: employeeData.fullName,
+      performedBy: 'Admin',
+      details: {
+        position: employeeData.position,
+        employmentId: employeeData.employmentId
+      }
+    });
+    
+    return newEmployee;
   } catch (error) {
     console.error('Error adding employee:', error);
     throw error;
@@ -90,6 +107,20 @@ export const updateEmployee = async (employeeId, updates, contractFile = null) =
     });
 
     await updateDoc(employeeRef, updateData);
+    
+    // Log the activity
+    await addChangeLog({
+      type: LOG_TYPES.EMPLOYEE_UPDATED,
+      action: 'Update',
+      description: createLogDescription(LOG_TYPES.EMPLOYEE_UPDATED, updates.fullName || 'Employee'),
+      employeeId: employeeId,
+      employeeName: updates.fullName,
+      performedBy: 'Admin',
+      details: {
+        updatedFields: Object.keys(updates)
+      }
+    });
+    
     return { id: employeeId, ...updateData };
   } catch (error) {
     console.error('Error updating employee:', error);
@@ -100,11 +131,29 @@ export const updateEmployee = async (employeeId, updates, contractFile = null) =
 // Archive employee (soft delete)
 export const archiveEmployee = async (employeeId) => {
   try {
+    // Get employee data first for logging
+    const employees = await getEmployees();
+    const employee = employees.find(emp => emp.id === employeeId);
+    
     const employeeRef = doc(db, EMPLOYEES_COLLECTION, employeeId);
     await updateDoc(employeeRef, {
       isArchived: true,
       archivedAt: Timestamp.now(),
       updatedAt: Timestamp.now()
+    });
+    
+    // Log the activity
+    await addChangeLog({
+      type: LOG_TYPES.EMPLOYEE_ARCHIVED,
+      action: 'Archive',
+      description: createLogDescription(LOG_TYPES.EMPLOYEE_ARCHIVED, employee?.fullName || 'Employee'),
+      employeeId: employeeId,
+      employeeName: employee?.fullName,
+      performedBy: 'Admin',
+      details: {
+        employmentId: employee?.employmentId,
+        position: employee?.position
+      }
     });
   } catch (error) {
     console.error('Error archiving employee:', error);
@@ -115,11 +164,29 @@ export const archiveEmployee = async (employeeId) => {
 // Restore archived employee
 export const restoreEmployee = async (employeeId) => {
   try {
+    // Get employee data first for logging
+    const employees = await getEmployees(true);
+    const employee = employees.find(emp => emp.id === employeeId);
+    
     const employeeRef = doc(db, EMPLOYEES_COLLECTION, employeeId);
     await updateDoc(employeeRef, {
       isArchived: false,
       archivedAt: null,
       updatedAt: Timestamp.now()
+    });
+    
+    // Log the activity
+    await addChangeLog({
+      type: LOG_TYPES.EMPLOYEE_RESTORED,
+      action: 'Restore',
+      description: createLogDescription(LOG_TYPES.EMPLOYEE_RESTORED, employee?.fullName || 'Employee'),
+      employeeId: employeeId,
+      employeeName: employee?.fullName,
+      performedBy: 'Admin',
+      details: {
+        employmentId: employee?.employmentId,
+        position: employee?.position
+      }
     });
   } catch (error) {
     console.error('Error restoring employee:', error);
@@ -130,7 +197,26 @@ export const restoreEmployee = async (employeeId) => {
 // Delete employee permanently
 export const deleteEmployee = async (employeeId) => {
   try {
+    // Get employee data first for logging
+    const employees = await getEmployees(true);
+    const employee = employees.find(emp => emp.id === employeeId);
+    
     await deleteDoc(doc(db, EMPLOYEES_COLLECTION, employeeId));
+    
+    // Log the activity
+    await addChangeLog({
+      type: LOG_TYPES.EMPLOYEE_DELETED,
+      action: 'Delete',
+      description: createLogDescription(LOG_TYPES.EMPLOYEE_DELETED, employee?.fullName || 'Employee'),
+      employeeId: employeeId,
+      employeeName: employee?.fullName,
+      performedBy: 'Admin',
+      details: {
+        employmentId: employee?.employmentId,
+        position: employee?.position,
+        warning: 'Permanently deleted from database'
+      }
+    });
   } catch (error) {
     console.error('Error deleting employee:', error);
     throw error;
