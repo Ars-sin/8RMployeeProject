@@ -1,98 +1,285 @@
-import React from 'react';
-import { Users, UserPlus, FileText, Calendar, LogOut } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { Users, Archive, ClipboardList, LogOut, Plus, Edit2, Trash2, Search } from 'lucide-react';
+import ArchivedPage from './ArchivedPage';
+import ChangeLogsPage from './ChangeLogsPage';
+import AddEmployeeForm from './AddEmployeeForm';
+import { getEmployees, addEmployee, updateEmployee, archiveEmployee } from '../../services/employeeService';
 
 const HRDashboard = ({ user, onLogout }) => {
+  const [sidebarOpen, setSidebarOpen] = useState(true);
+  const [currentView, setCurrentView] = useState('employees');
+  const [employees, setEmployees] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [showAddForm, setShowAddForm] = useState(false);
+  const [editingEmployee, setEditingEmployee] = useState(null);
+  const [searchTerm, setSearchTerm] = useState('');
+
+  useEffect(() => {
+    loadEmployees();
+  }, []);
+
+  const loadEmployees = async () => {
+    try {
+      setLoading(true);
+      const data = await getEmployees();
+      setEmployees(data);
+    } catch (error) {
+      console.error('Error loading employees:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleAddEmployee = async (formData) => {
+    try {
+      await addEmployee(formData);
+      await loadEmployees();
+      setShowAddForm(false);
+    } catch (error) {
+      console.error('Error adding employee:', error);
+      alert('Failed to add employee');
+    }
+  };
+
+  const handleEditEmployee = async (formData) => {
+    try {
+      await updateEmployee(editingEmployee.id, formData);
+      await loadEmployees();
+      setEditingEmployee(null);
+      setShowAddForm(false);
+    } catch (error) {
+      console.error('Error updating employee:', error);
+      alert('Failed to update employee');
+    }
+  };
+
+  const handleDeleteEmployee = async (employeeId) => {
+    if (window.confirm('Are you sure you want to archive this employee?')) {
+      try {
+        await archiveEmployee(employeeId);
+        await loadEmployees();
+      } catch (error) {
+        console.error('Error archiving employee:', error);
+        alert('Failed to archive employee');
+      }
+    }
+  };
+
+  const handleEditClick = (employee) => {
+    setEditingEmployee(employee);
+    setShowAddForm(true);
+  };
+
+  const filteredEmployees = employees.filter(emp => 
+    emp.fullName?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    emp.email?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    emp.employmentId?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    emp.position?.toLowerCase().includes(searchTerm.toLowerCase())
+  );
+
   return (
-    <div className="min-h-screen bg-gray-50">
-      {/* Header */}
-      <header className="bg-white shadow-sm border-b">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 flex justify-between items-center">
-          <div>
-            <h1 className="text-2xl font-bold text-gray-900">HR Dashboard</h1>
-            <p className="text-sm text-gray-600">Welcome, {user?.fullName}</p>
+    <div className="flex h-screen bg-gray-50">
+      <div className={`bg-white transition-all duration-300 relative ${sidebarOpen ? 'w-64' : 'w-0'} overflow-hidden flex flex-col`}>
+        <div className="p-6 pb-24 flex-1">
+          <div className="flex items-center gap-2 mb-8">
+            <div className="w-10 h-10 bg-white border-2 border-gray-200 rounded-lg flex items-center justify-center">
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
+                <path d="M5 17 L5 10 L10 5 L15 10 L15 17" stroke="#666" strokeWidth="1.5" fill="none"/>
+                <rect x="7.5" y="12.5" width="5" height="4.5" fill="#666"/>
+              </svg>
+            </div>
+            <div>
+              <h1 className="text-xl font-bold">
+                <span className="text-green-600">8</span>
+                <span className="text-gray-800">RM</span>
+              </h1>
+            </div>
           </div>
-          <button
+
+          <div className="mb-6 p-3 bg-blue-50 rounded-lg">
+            <p className="text-xs text-gray-500">Logged in as</p>
+            <p className="text-sm font-semibold text-gray-900">{user?.fullName || 'HR User'}</p>
+            <p className="text-xs text-gray-600">{user?.position || 'HR Department'}</p>
+          </div>
+
+          <div>
+            <p className="text-xs font-semibold text-gray-400 uppercase mb-3">HR Management</p>
+            <nav className="space-y-1">
+              <button 
+                onClick={() => setCurrentView('employees')}
+                className={`w-full flex items-center gap-3 px-4 py-2.5 rounded-lg font-medium ${
+                  currentView === 'employees' 
+                    ? 'bg-blue-50 text-blue-600' 
+                    : 'text-gray-600 hover:bg-gray-50'
+                }`}
+              >
+                <Users className="w-5 h-5" />
+                Employees
+              </button>
+              
+              <button 
+                onClick={() => setCurrentView('archived')}
+                className={`w-full flex items-center gap-3 px-4 py-2.5 rounded-lg font-medium ${
+                  currentView === 'archived' 
+                    ? 'bg-blue-50 text-blue-600' 
+                    : 'text-gray-600 hover:bg-gray-50'
+                }`}
+              >
+                <Archive className="w-5 h-5" />
+                Archived
+              </button>
+              
+              <button 
+                onClick={() => setCurrentView('changelogs')}
+                className={`w-full flex items-center gap-3 px-4 py-2.5 rounded-lg font-medium ${
+                  currentView === 'changelogs' 
+                    ? 'bg-blue-50 text-blue-600' 
+                    : 'text-gray-600 hover:bg-gray-50'
+                }`}
+              >
+                <ClipboardList className="w-5 h-5" />
+                Change Logs
+              </button>
+            </nav>
+          </div>
+        </div>
+
+        <div className="p-6">
+          <button 
             onClick={onLogout}
-            className="flex items-center gap-2 px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors"
+            className="w-full flex items-center justify-center gap-2 px-4 py-3 bg-blue-600 text-white rounded-lg font-semibold hover:bg-blue-700 transition-colors shadow-sm"
           >
-            <LogOut className="w-4 h-4" />
+            <LogOut className="w-5 h-5" />
             Logout
           </button>
         </div>
-      </header>
+      </div>
 
-      {/* Main Content */}
-      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        {/* Stats Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-          <div className="bg-white rounded-lg shadow p-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-gray-600">Total Employees</p>
-                <p className="text-2xl font-bold text-gray-900">0</p>
+      <div className="flex-1 flex flex-col overflow-hidden ml-1">
+        {currentView === 'archived' ? (
+          <ArchivedPage />
+        ) : currentView === 'changelogs' ? (
+          <ChangeLogsPage />
+        ) : (
+          <div className="flex-1 flex flex-col bg-white">
+            <div className="px-6 py-4 border-b border-gray-200">
+              <div className="flex items-center justify-between mb-4">
+                <h2 className="text-2xl font-bold text-gray-900">Employee Management</h2>
+                <button
+                  onClick={() => {
+                    setEditingEmployee(null);
+                    setShowAddForm(true);
+                  }}
+                  className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+                >
+                  <Plus className="w-5 h-5" />
+                  Add Employee
+                </button>
               </div>
-              <Users className="w-10 h-10 text-blue-600" />
+              
+              <div className="relative">
+                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400" />
+                <input
+                  type="text"
+                  placeholder="Search employees..."
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                />
+              </div>
+            </div>
+
+            <div className="flex-1 overflow-auto">
+              {loading ? (
+                <div className="flex items-center justify-center h-full">
+                  <p className="text-gray-500">Loading employees...</p>
+                </div>
+              ) : filteredEmployees.length === 0 ? (
+                <div className="flex items-center justify-center h-full">
+                  <p className="text-gray-500">No employees found</p>
+                </div>
+              ) : (
+                <table className="w-full">
+                  <thead className="bg-gray-50 sticky top-0">
+                    <tr>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        Employee ID
+                      </th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        Name
+                      </th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        Email
+                      </th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        Position
+                      </th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        Status
+                      </th>
+                      <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        Actions
+                      </th>
+                    </tr>
+                  </thead>
+                  <tbody className="bg-white divide-y divide-gray-200">
+                    {filteredEmployees.map((employee) => (
+                      <tr key={employee.id} className="hover:bg-gray-50">
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                          {employee.employmentId}
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
+                          {employee.fullName}
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                          {employee.email}
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                          {employee.position}
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap">
+                          <span className={`px-2 py-1 text-xs font-semibold rounded-full ${
+                            employee.status === 'Regular' 
+                              ? 'bg-green-100 text-green-800' 
+                              : 'bg-yellow-100 text-yellow-800'
+                          }`}>
+                            {employee.status}
+                          </span>
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                          <button
+                            onClick={() => handleEditClick(employee)}
+                            className="text-blue-600 hover:text-blue-900 mr-4"
+                          >
+                            <Edit2 className="w-4 h-4 inline" />
+                          </button>
+                          <button
+                            onClick={() => handleDeleteEmployee(employee.id)}
+                            className="text-red-600 hover:text-red-900"
+                          >
+                            <Trash2 className="w-4 h-4 inline" />
+                          </button>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              )}
             </div>
           </div>
+        )}
+      </div>
 
-          <div className="bg-white rounded-lg shadow p-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-gray-600">New Hires</p>
-                <p className="text-2xl font-bold text-gray-900">0</p>
-              </div>
-              <UserPlus className="w-10 h-10 text-green-600" />
-            </div>
-          </div>
-
-          <div className="bg-white rounded-lg shadow p-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-gray-600">Leave Requests</p>
-                <p className="text-2xl font-bold text-gray-900">0</p>
-              </div>
-              <Calendar className="w-10 h-10 text-orange-600" />
-            </div>
-          </div>
-
-          <div className="bg-white rounded-lg shadow p-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-gray-600">Documents</p>
-                <p className="text-2xl font-bold text-gray-900">0</p>
-              </div>
-              <FileText className="w-10 h-10 text-purple-600" />
-            </div>
-          </div>
-        </div>
-
-        {/* Quick Actions */}
-        <div className="bg-white rounded-lg shadow p-6 mb-8">
-          <h2 className="text-lg font-semibold text-gray-900 mb-4">Quick Actions</h2>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <button className="p-4 border-2 border-gray-200 rounded-lg hover:border-blue-500 hover:bg-blue-50 transition-all">
-              <UserPlus className="w-6 h-6 text-blue-600 mb-2" />
-              <p className="font-medium text-gray-900">Add Employee</p>
-            </button>
-            <button className="p-4 border-2 border-gray-200 rounded-lg hover:border-green-500 hover:bg-green-50 transition-all">
-              <Calendar className="w-6 h-6 text-green-600 mb-2" />
-              <p className="font-medium text-gray-900">Manage Leave</p>
-            </button>
-            <button className="p-4 border-2 border-gray-200 rounded-lg hover:border-purple-500 hover:bg-purple-50 transition-all">
-              <FileText className="w-6 h-6 text-purple-600 mb-2" />
-              <p className="font-medium text-gray-900">Generate Report</p>
-            </button>
-          </div>
-        </div>
-
-        {/* Recent Activity */}
-        <div className="bg-white rounded-lg shadow p-6">
-          <h2 className="text-lg font-semibold text-gray-900 mb-4">Recent Activity</h2>
-          <div className="text-center py-8 text-gray-500">
-            No recent activity
-          </div>
-        </div>
-      </main>
+      {showAddForm && (
+        <AddEmployeeForm
+          employee={editingEmployee}
+          onClose={() => {
+            setShowAddForm(false);
+            setEditingEmployee(null);
+          }}
+          onSave={editingEmployee ? handleEditEmployee : handleAddEmployee}
+        />
+      )}
     </div>
   );
 };

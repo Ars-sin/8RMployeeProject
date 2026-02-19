@@ -225,9 +225,9 @@ const ChangeLogsPage = ({ onNavigate }) => {
                       </td>
                       <td className="px-6 py-4">
                         <div>
-                          <div className="text-sm font-semibold text-blue-600 mb-0.5">
+                          {/*<div className="text-sm font-semibold text-blue-600 mb-0.5">
                             {log.employeeId || 'N/A'}
-                          </div>
+                          </div>*/}
                           <div className="text-sm text-gray-900 font-medium">
                             {log.employeeName || 'System'}
                           </div>

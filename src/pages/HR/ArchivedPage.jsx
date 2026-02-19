@@ -189,9 +189,10 @@ const ArchivedPage = ({ onNavigate }) => {
                     </td>
                     <td className="px-6 py-4">
                       <div>
-                        <div className="text-sm font-semibold text-blue-600 mb-0.5">
+                        {/*<div className="text-sm font-semibold text-blue-600 mb-0.5">
                           {employee.employmentId || 'N/A'}
                         </div>
+                        */}
                         <div className="text-sm text-gray-900 font-medium">
                           {employee.fullName || employee.name || 'No Name'}
                         </div>
