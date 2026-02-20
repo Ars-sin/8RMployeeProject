@@ -2,81 +2,84 @@ import React, { useState, useEffect } from 'react';
 import { Menu, Users, Archive, ClipboardList, Shield, LogOut, Plus, Edit2, Trash2, Search } from 'lucide-react';
 import AdminArchived from './AdminArchived';
 import AdminChangeLogs from './AdminChangeLogs';
-import AddEmployeeForm from '../HR/AddEmployeeForm';
-import { getEmployees, addEmployee, updateEmployee, archiveEmployee } from '../../services/employeeService';
+import AddAdminModal from './AddAdminModal';
+import { getAdmins, addAdmin, updateAdmin, deleteAdmin } from '../../services/adminService';
 
 
 const AdminDashboard = ({ onLogout }) => {
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [currentView, setCurrentView] = useState('admins'); // 'admins', 'archived', 'changelogs'
-  const [employees, setEmployees] = useState([]);
+  const [admins, setAdmins] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [showAddForm, setShowAddForm] = useState(false);
-  const [editingEmployee, setEditingEmployee] = useState(null);
+  const [showAddAdminModal, setShowAddAdminModal] = useState(false);
+  const [editingAdmin, setEditingAdmin] = useState(null);
   const [searchTerm, setSearchTerm] = useState('');
 
-  // Load employees
+  // Load admins
   useEffect(() => {
-    loadEmployees();
+    loadAdmins();
   }, []);
 
-  const loadEmployees = async () => {
+  const loadAdmins = async () => {
     try {
       setLoading(true);
-      const data = await getEmployees();
-      setEmployees(data);
+      const data = await getAdmins();
+      setAdmins(data);
     } catch (error) {
-      console.error('Error loading employees:', error);
+      console.error('Error loading admins:', error);
     } finally {
       setLoading(false);
     }
   };
 
-  const handleAddEmployee = async (formData) => {
+  const handleAddAdmin = async (formData) => {
     try {
-      await addEmployee(formData);
-      await loadEmployees();
-      setShowAddForm(false);
+      await addAdmin(formData);
+      await loadAdmins();
+      setShowAddAdminModal(false);
+      alert('Admin added successfully!');
     } catch (error) {
-      console.error('Error adding employee:', error);
-      alert('Failed to add employee');
+      console.error('Error adding admin:', error);
+      alert('Failed to add admin');
     }
   };
 
-  const handleEditEmployee = async (formData) => {
+  const handleEditAdmin = async (formData) => {
     try {
-      await updateEmployee(editingEmployee.id, formData);
-      await loadEmployees();
-      setEditingEmployee(null);
-      setShowAddForm(false);
+      await updateAdmin(editingAdmin.id, formData);
+      await loadAdmins();
+      setEditingAdmin(null);
+      setShowAddAdminModal(false);
+      alert('Admin updated successfully!');
     } catch (error) {
-      console.error('Error updating employee:', error);
-      alert('Failed to update employee');
+      console.error('Error updating admin:', error);
+      alert('Failed to update admin');
     }
   };
 
-  const handleDeleteEmployee = async (employeeId) => {
-    if (window.confirm('Are you sure you want to archive this employee?')) {
+  const handleDeleteAdmin = async (adminId) => {
+    if (window.confirm('Are you sure you want to delete this admin?')) {
       try {
-        await archiveEmployee(employeeId);
-        await loadEmployees();
+        await deleteAdmin(adminId);
+        await loadAdmins();
+        alert('Admin deleted successfully!');
       } catch (error) {
-        console.error('Error archiving employee:', error);
-        alert('Failed to archive employee');
+        console.error('Error deleting admin:', error);
+        alert('Failed to delete admin');
       }
     }
   };
 
-  const handleEditClick = (employee) => {
-    setEditingEmployee(employee);
-    setShowAddForm(true);
+  const handleEditClick = (admin) => {
+    setEditingAdmin(admin);
+    setShowAddAdminModal(true);
   };
 
-  const filteredEmployees = employees.filter(emp => 
-    emp.fullName?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    emp.email?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    emp.employmentId?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    emp.position?.toLowerCase().includes(searchTerm.toLowerCase())
+  const filteredAdmins = admins.filter(admin => 
+    admin.fullName?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    admin.email?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    admin.idNumber?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    admin.position?.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
   return (
@@ -162,21 +165,21 @@ const AdminDashboard = ({ onLogout }) => {
         ) : currentView === 'changelogs' ? (
           <AdminChangeLogs />
         ) : (
-          // Employee List View
+          // Admin List View
           <div className="flex-1 flex flex-col bg-white">
             {/* Header */}
             <div className="px-6 py-4 border-b border-gray-200">
               <div className="flex items-center justify-between mb-4">
-                <h2 className="text-2xl font-bold text-gray-900">Employee Management</h2>
+                <h2 className="text-2xl font-bold text-gray-900">Admin Management</h2>
                 <button
                   onClick={() => {
-                    setEditingEmployee(null);
-                    setShowAddForm(true);
+                    setEditingAdmin(null);
+                    setShowAddAdminModal(true);
                   }}
                   className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
                 >
                   <Plus className="w-5 h-5" />
-                  Add Employee
+                  Add Admin
                 </button>
               </div>
               
@@ -185,7 +188,7 @@ const AdminDashboard = ({ onLogout }) => {
                 <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400" />
                 <input
                   type="text"
-                  placeholder="Search employees..."
+                  placeholder="Search for id, name Customer"
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
                   className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
@@ -193,73 +196,67 @@ const AdminDashboard = ({ onLogout }) => {
               </div>
             </div>
 
-            {/* Employee Table */}
+            {/* Admin Table */}
             <div className="flex-1 overflow-auto">
               {loading ? (
                 <div className="flex items-center justify-center h-full">
-                  <p className="text-gray-500">Loading employees...</p>
+                  <p className="text-gray-500">Loading admins...</p>
                 </div>
-              ) : filteredEmployees.length === 0 ? (
+              ) : filteredAdmins.length === 0 ? (
                 <div className="flex items-center justify-center h-full">
-                  <p className="text-gray-500">No employees found</p>
+                  <p className="text-gray-500">No admins found</p>
                 </div>
               ) : (
                 <table className="w-full">
                   <thead className="bg-gray-50 sticky top-0">
                     <tr>
                       <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                        Employee ID
+                        <input type="checkbox" className="rounded" />
                       </th>
                       <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                        Name
+                        Admin
                       </th>
                       <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                        Email
+                        ID
+                      </th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        Gmail
                       </th>
                       <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                         Position
                       </th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                        Status
-                      </th>
                       <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
-                        Actions
+                        Action
                       </th>
                     </tr>
                   </thead>
                   <tbody className="bg-white divide-y divide-gray-200">
-                    {filteredEmployees.map((employee) => (
-                      <tr key={employee.id} className="hover:bg-gray-50">
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                          {employee.employmentId}
+                    {filteredAdmins.map((admin) => (
+                      <tr key={admin.id} className="hover:bg-gray-50">
+                        <td className="px-6 py-4 whitespace-nowrap">
+                          <input type="checkbox" className="rounded" />
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
-                          {employee.fullName}
+                          {admin.fullName}
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-blue-600">
+                          {admin.idNumber}
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                          {employee.email}
+                          {admin.email}
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                          {employee.position}
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap">
-                          <span className={`px-2 py-1 text-xs font-semibold rounded-full ${
-                            employee.status === 'Regular' 
-                              ? 'bg-green-100 text-green-800' 
-                              : 'bg-yellow-100 text-yellow-800'
-                          }`}>
-                            {employee.status}
-                          </span>
+                          {admin.position}
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
                           <button
-                            onClick={() => handleEditClick(employee)}
+                            onClick={() => handleEditClick(admin)}
                             className="text-blue-600 hover:text-blue-900 mr-4"
                           >
                             <Edit2 className="w-4 h-4 inline" />
                           </button>
                           <button
-                            onClick={() => handleDeleteEmployee(employee.id)}
+                            onClick={() => handleDeleteAdmin(admin.id)}
                             className="text-red-600 hover:text-red-900"
                           >
                             <Trash2 className="w-4 h-4 inline" />
@@ -275,15 +272,15 @@ const AdminDashboard = ({ onLogout }) => {
         )}
       </div>
 
-      {/* Add/Edit Employee Modal */}
-      {showAddForm && (
-        <AddEmployeeForm
-          employee={editingEmployee}
+      {/* Add/Edit Admin Modal */}
+      {showAddAdminModal && (
+        <AddAdminModal
+          admin={editingAdmin}
           onClose={() => {
-            setShowAddForm(false);
-            setEditingEmployee(null);
+            setShowAddAdminModal(false);
+            setEditingAdmin(null);
           }}
-          onSave={editingEmployee ? handleEditEmployee : handleAddEmployee}
+          onSave={editingAdmin ? handleEditAdmin : handleAddAdmin}
         />
       )}
     </div>

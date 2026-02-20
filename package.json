@@ -1,6 +1,7 @@
 {
   "name": "brm-system",
   "version": "1.0.0",
+  "type": "module",
   "description": "8RM Building Resource Management System",
   "private": true,
   "scripts": {

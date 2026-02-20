@@ -2,45 +2,74 @@ import { collection, query, where, getDocs } from 'firebase/firestore';
 import { db } from '../firebase';
 
 const EMPLOYEES_COLLECTION = 'employees';
+const ADMINS_COLLECTION = 'admins';
 
-// Admin credentials for Employee Dashboard (hardcoded)
-const ADMIN_CREDENTIALS = {
+// Admin credentials for super admin (hardcoded)
+const SUPER_ADMIN_CREDENTIALS = {
   email: 'acharlesjyth@gmail.com',
   password: 'Ch@rles123'
 };
 
-// Login function - checks admin first, then employee database
+// Login function - checks super admin first, then admins collection, then employee database
 export const loginUser = async (email, password) => {
   try {
-    // Check if admin login
-    if (email === ADMIN_CREDENTIALS.email && password === ADMIN_CREDENTIALS.password) {
+    // Check if super admin login
+    if (email === SUPER_ADMIN_CREDENTIALS.email && password === SUPER_ADMIN_CREDENTIALS.password) {
       return {
         success: true,
         user: {
-          email: ADMIN_CREDENTIALS.email,
-          fullName: 'Admin',
+          email: SUPER_ADMIN_CREDENTIALS.email,
+          fullName: 'Super Admin',
           position: 'Administrator',
-          role: 'admin'
+          role: 'super_admin'
         },
         dashboardType: 'employee',
+        message: 'Super admin login successful'
+      };
+    }
+
+    // Check admins collection (email + idNumber as password)
+    const adminQuery = query(
+      collection(db, ADMINS_COLLECTION),
+      where('email', '==', email),
+      where('idNumber', '==', password)
+    );
+
+    const adminSnapshot = await getDocs(adminQuery);
+
+    if (!adminSnapshot.empty) {
+      const adminDoc = adminSnapshot.docs[0];
+      const admin = {
+        id: adminDoc.id,
+        ...adminDoc.data(),
+        role: 'admin'
+      };
+
+      // Determine dashboard based on admin position
+      const dashboardType = getDashboardRoute(admin.position);
+
+      return {
+        success: true,
+        user: admin,
+        dashboardType,
         message: 'Admin login successful'
       };
     }
 
     // Check employee database (email + employmentId as password)
-    const q = query(
+    const employeeQuery = query(
       collection(db, EMPLOYEES_COLLECTION),
       where('email', '==', email),
       where('employmentId', '==', password)
     );
 
-    const querySnapshot = await getDocs(q);
+    const employeeSnapshot = await getDocs(employeeQuery);
 
-    if (querySnapshot.empty) {
-      return { success: false, message: 'Invalid password or Employee ID' };
+    if (employeeSnapshot.empty) {
+      return { success: false, message: 'Invalid email or password/ID' };
     }
 
-    const employeeDoc = querySnapshot.docs[0];
+    const employeeDoc = employeeSnapshot.docs[0];
     const employee = {
       id: employeeDoc.id,
       ...employeeDoc.data(),
