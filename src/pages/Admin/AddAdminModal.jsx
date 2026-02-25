@@ -1,5 +1,6 @@
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { X } from 'lucide-react';
+import { checkDuplicateAdmin } from '../../services/adminService';
 
 const AddAdminModal = ({ admin, onClose, onSave }) => {
   const [formData, setFormData] = useState({
@@ -38,7 +39,7 @@ const AddAdminModal = ({ admin, onClose, onSave }) => {
     }
   };
 
-  const validateForm = () => {
+  const validateForm = async () => {
     const newErrors = {};
 
     if (!formData.fullName.trim()) {
@@ -59,14 +60,37 @@ const AddAdminModal = ({ admin, onClose, onSave }) => {
       newErrors.position = 'Position is required';
     }
 
+    // Check for duplicates only if basic validation passes
+    if (!newErrors.email && !newErrors.position) {
+      try {
+        const duplicates = await checkDuplicateAdmin(
+          formData.email, 
+          formData.position,
+          admin?.id // Exclude current admin when editing
+        );
+        
+        if (duplicates.email) {
+          newErrors.email = `This email is already used by ${duplicates.emailAdmin}`;
+        }
+        
+        if (duplicates.position) {
+          newErrors.position = `This position is already assigned to ${duplicates.positionAdmin}`;
+        }
+      } catch (error) {
+        console.error('Error checking duplicates:', error);
+        newErrors.general = 'Error validating admin data. Please try again.';
+      }
+    }
+
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
   };
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
     
-    if (validateForm()) {
+    const isValid = await validateForm();
+    if (isValid) {
       onSave(formData);
     }
   };
@@ -89,6 +113,13 @@ const AddAdminModal = ({ admin, onClose, onSave }) => {
 
         {/* Form Content */}
         <form onSubmit={handleSubmit} className="p-6 space-y-4">
+          
+          {/* General Error Message */}
+          {errors.general && (
+            <div className="p-3 bg-red-50 border border-red-200 rounded-lg">
+              <p className="text-sm text-red-600">{errors.general}</p>
+            </div>
+          )}
           
           {/* Full Name */}
           <div>

@@ -1,14 +1,14 @@
 import React, { useState, useEffect } from 'react';
-import { Search, Filter, Download, RefreshCw, Menu } from 'lucide-react';
+import { Search, Filter, Download, RefreshCw } from 'lucide-react';
 import { getChangeLogs, formatLogTimestamp } from '../../services/changeLogService';
 
-const ChangeLogsPage = ({ onNavigate }) => {
-  const [selectedLogs, setSelectedLogs] = useState([]);
+const ChangeLogsPage = ({ onNavigate, selectedProject }) => {
   const [searchQuery, setSearchQuery] = useState('');
   const [currentPage, setCurrentPage] = useState(1);
   const [changeLogs, setChangeLogs] = useState([]);
   const [loading, setLoading] = useState(true);
   const [filterType, setFilterType] = useState('all');
+  const itemsPerPage = 10;
 
   // Load change logs from Firebase
   useEffect(() => {
@@ -61,39 +61,41 @@ const ChangeLogsPage = ({ onNavigate }) => {
     }
   };
 
-  const handleSelectLog = (id) => {
-    setSelectedLogs(prev => 
-      prev.includes(id) 
-        ? prev.filter(logId => logId !== id)
-        : [...prev, id]
-    );
-  };
-
-  const handleSelectAll = () => {
-    if (selectedLogs.length === changeLogs.length) {
-      setSelectedLogs([]);
-    } else {
-      setSelectedLogs(changeLogs.map(log => log.id));
-    }
-  };
-
   const handleExport = () => {
     alert('Exporting change logs data...');
   };
 
-  const filteredLogs = changeLogs.filter(log => {
-    const matchesSearch = 
-      (log.employeeName?.toLowerCase() || '').includes(searchQuery.toLowerCase()) ||
-      (log.description?.toLowerCase() || '').includes(searchQuery.toLowerCase()) ||
-      (log.performedBy?.toLowerCase() || '').includes(searchQuery.toLowerCase()) ||
-      (log.action?.toLowerCase() || '').includes(searchQuery.toLowerCase());
-    
-    const matchesFilter = filterType === 'all' || log.type === filterType;
-    
-    return matchesSearch && matchesFilter;
-  });
+  const filteredLogs = changeLogs
+    .filter(log => {
+      // Filter by project if one is selected
+      if (selectedProject) {
+        // Only show logs that have matching projectId
+        return log.projectId === selectedProject.id;
+      }
+      return true;
+    })
+    .filter(log => {
+      const matchesSearch = 
+        (log.employeeName?.toLowerCase() || '').includes(searchQuery.toLowerCase()) ||
+        (log.description?.toLowerCase() || '').includes(searchQuery.toLowerCase()) ||
+        (log.performedBy?.toLowerCase() || '').includes(searchQuery.toLowerCase()) ||
+        (log.action?.toLowerCase() || '').includes(searchQuery.toLowerCase());
+      
+      const matchesFilter = filterType === 'all' || log.type === filterType;
+      
+      return matchesSearch && matchesFilter;
+    });
 
-  const totalPages = 13;
+  // Pagination calculations
+  const totalPages = Math.ceil(filteredLogs.length / itemsPerPage);
+  const startIndex = (currentPage - 1) * itemsPerPage;
+  const endIndex = startIndex + itemsPerPage;
+  const paginatedLogs = filteredLogs.slice(startIndex, endIndex);
+
+  // Reset to page 1 when search or filter changes
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchQuery, filterType]);
 
   return (
     <div className="flex-1 flex flex-col overflow-hidden bg-gray-50">
@@ -101,16 +103,10 @@ const ChangeLogsPage = ({ onNavigate }) => {
       <header className="bg-white border-b border-gray-200 px-8 py-5">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-4">
-            <button 
-              onClick={() => onNavigate && onNavigate('employees')}
-              className="p-2 hover:bg-gray-100 rounded-lg"
-            >
-              <Menu className="w-5 h-5 text-gray-600" />
-            </button>
             <div>
               <h1 className="text-2xl font-semibold text-gray-900">Change Logs</h1>
               <div className="flex items-center gap-2 text-sm text-gray-500 mt-0.5">
-                <span>General</span>
+                <span>HR Management</span>
                 <span>›</span>
                 <span className="text-blue-600">Change Logs</span>
               </div>
@@ -120,10 +116,10 @@ const ChangeLogsPage = ({ onNavigate }) => {
       </header>
 
       {/* Content */}
-      <main className="flex-1 overflow-auto p-8">
-        <div className="bg-white rounded-lg shadow-sm border border-gray-200">
+      <main className="flex-1 flex flex-col overflow-hidden p-8">
+        <div className="flex-1 flex flex-col bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
           {/* Toolbar */}
-          <div className="p-6 border-b border-gray-200">
+          <div className="p-6 border-b border-gray-200 flex-shrink-0">
             <div className="flex items-center justify-between gap-4">
               {/* Search */}
               <div className="flex-1 max-w-md relative">
@@ -172,19 +168,11 @@ const ChangeLogsPage = ({ onNavigate }) => {
             </div>
           </div>
 
-          {/* Table */}
-          <div className="overflow-x-auto">
+          {/* Scrollable Table Container */}
+          <div className="flex-1 overflow-auto">
             <table className="w-full">
-              <thead>
-                <tr className="border-b border-gray-200 bg-white">
-                  <th className="px-6 py-4 text-left w-12">
-                    <input
-                      type="checkbox"
-                      checked={selectedLogs.length === changeLogs.length}
-                      onChange={handleSelectAll}
-                      className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
-                    />
-                  </th>
+              <thead className="bg-white sticky top-0 z-10">
+                <tr className="border-b border-gray-200">
                   <th className="px-6 py-4 text-left text-xs font-bold text-gray-700 uppercase tracking-wider">
                     USER
                   </th>
@@ -202,33 +190,27 @@ const ChangeLogsPage = ({ onNavigate }) => {
               <tbody>
                 {loading ? (
                   <tr>
-                    <td colSpan="5" className="px-6 py-12 text-center text-gray-500">
+                    <td colSpan="4" className="px-6 py-12 text-center text-gray-500">
                       Loading change logs...
                     </td>
                   </tr>
                 ) : filteredLogs.length === 0 ? (
                   <tr>
-                    <td colSpan="5" className="px-6 py-12 text-center text-gray-500">
-                      No change logs found
+                    <td colSpan="4" className="px-6 py-12 text-center">
+                      <div className="text-gray-500">
+                        <p className="mb-2">No change logs found</p>
+                        <p className="text-sm text-gray-400">
+                          Change logs will appear here when you add, update, or archive employees
+                        </p>
+                      </div>
                     </td>
                   </tr>
                 ) : (
-                  filteredLogs.map((log, index) => (
+                  paginatedLogs.map((log, index) => (
                     <tr key={log.id || index} className="border-b border-gray-100 hover:bg-gray-50 transition-colors">
                       <td className="px-6 py-4">
-                        <input
-                          type="checkbox"
-                          checked={selectedLogs.includes(log.id)}
-                          onChange={() => handleSelectLog(log.id)}
-                          className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
-                        />
-                      </td>
-                      <td className="px-6 py-4">
                         <div>
-                          {/*<div className="text-sm font-semibold text-blue-600 mb-0.5">
-                            {log.employeeId || 'N/A'}
-                          </div>*/}
-                          <div className="text-sm text-gray-900 font-medium">
+                          <div className="text-sm font-semibold text-gray-900 mb-0.5">
                             {log.employeeName || 'System'}
                           </div>
                         </div>
@@ -258,31 +240,47 @@ const ChangeLogsPage = ({ onNavigate }) => {
             </table>
           </div>
 
-          {/* Pagination */}
-          <div className="px-6 py-4 border-t border-gray-200 flex items-center justify-between">
+          {/* Fixed Pagination at Bottom */}
+          <div className="px-6 py-4 border-t border-gray-200 flex-shrink-0 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 bg-white">
             <div className="text-sm text-gray-600">
-              1 - 10 of {totalPages} Pages
+              {filteredLogs.length > 0 ? (
+                <>
+                  Showing {startIndex + 1} - {Math.min(endIndex, filteredLogs.length)} of {filteredLogs.length} change log{filteredLogs.length !== 1 ? 's' : ''}
+                </>
+              ) : (
+                'No change logs'
+              )}
             </div>
+            
             <div className="flex items-center gap-2">
-              <span className="text-sm text-gray-600">This page on</span>
-              <select className="px-3 py-1 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
-                <option>1</option>
-                <option>2</option>
-                <option>3</option>
+              <span className="text-sm text-gray-600">Page</span>
+              <select 
+                value={currentPage}
+                onChange={(e) => setCurrentPage(Number(e.target.value))}
+                className="px-3 py-1 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+              >
+                {Array.from({ length: totalPages || 1 }, (_, i) => i + 1).map(page => (
+                  <option key={page} value={page}>{page}</option>
+                ))}
               </select>
+              <span className="text-sm text-gray-600">of {totalPages || 1}</span>
+              
               <button 
                 onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
                 disabled={currentPage === 1}
-                className="p-2 border border-gray-300 rounded-lg hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+                className="p-2 border border-gray-300 rounded-lg hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                title="Previous page"
               >
                 <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
                 </svg>
               </button>
+              
               <button 
-                onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
-                disabled={currentPage === totalPages}
-                className="p-2 border border-gray-300 rounded-lg hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+                onClick={() => setCurrentPage(prev => Math.min(totalPages || 1, prev + 1))}
+                disabled={currentPage === (totalPages || 1)}
+                className="p-2 border border-gray-300 rounded-lg hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                title="Next page"
               >
                 <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />

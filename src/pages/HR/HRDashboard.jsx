@@ -1,15 +1,17 @@
 import React, { useState, useEffect } from 'react';
-import { Users, Archive, ClipboardList, LogOut, Plus, Edit2, Trash2, Search, Briefcase } from 'lucide-react';
+import { Users, Archive, ClipboardList, LogOut, Plus, Trash2, Search, Briefcase } from 'lucide-react';
 import ArchivedPage from './ArchivedPage';
 import ChangeLogsPage from './ChangeLogsPage';
 import AddEmployeeForm from './AddEmployeeForm';
 import { getEmployees, addEmployee, updateEmployee, archiveEmployee } from '../../services/employeeService';
 import { getProjects, addProject, updateProject, deleteProject } from '../../services/projectService';
 import AddProjectModal from './AddProjectModal.jsx';
+import editIcon from '../../Components/ui/edit.png';
 
 const HRDashboard = ({ user, onLogout }) => {
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [currentView, setCurrentView] = useState('projects'); // 'projects', 'employees', 'archived', 'changelogs'
+  const [selectedProject, setSelectedProject] = useState(null); // Currently selected project
   const [employees, setEmployees] = useState([]);
   const [projects, setProjects] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -18,6 +20,9 @@ const HRDashboard = ({ user, onLogout }) => {
   const [editingEmployee, setEditingEmployee] = useState(null);
   const [editingProject, setEditingProject] = useState(null);
   const [searchTerm, setSearchTerm] = useState('');
+  const [currentProjectPage, setCurrentProjectPage] = useState(1);
+  const [currentEmployeePage, setCurrentEmployeePage] = useState(1);
+  const itemsPerPage = 10;
 
   useEffect(() => {
     loadEmployees();
@@ -47,7 +52,12 @@ const HRDashboard = ({ user, onLogout }) => {
 
   const handleAddEmployee = async (formData) => {
     try {
-      await addEmployee(formData);
+      // Add projectId if a project is selected
+      const employeeData = selectedProject 
+        ? { ...formData, projectId: selectedProject.id }
+        : formData;
+      
+      await addEmployee(employeeData);
       await loadEmployees();
       setShowAddEmployeeForm(false);
       alert('Employee added successfully!');
@@ -59,7 +69,12 @@ const HRDashboard = ({ user, onLogout }) => {
 
   const handleEditEmployee = async (formData) => {
     try {
-      await updateEmployee(editingEmployee.id, formData);
+      // Add projectId if a project is selected and employee doesn't have one
+      const employeeData = selectedProject 
+        ? { ...formData, projectId: selectedProject.id }
+        : formData;
+      
+      await updateEmployee(editingEmployee.id, employeeData);
       await loadEmployees();
       setEditingEmployee(null);
       setShowAddEmployeeForm(false);
@@ -130,7 +145,24 @@ const HRDashboard = ({ user, onLogout }) => {
     setShowAddProjectModal(true);
   };
 
-  const filteredEmployees = employees.filter(emp => 
+  const handleProjectClick = (project) => {
+    setSelectedProject(project);
+    setCurrentView('employees');
+    setSearchTerm(''); // Reset search when switching projects
+  };
+
+  const handleBackToProjects = () => {
+    setSelectedProject(null);
+    setCurrentView('projects');
+    setSearchTerm('');
+  };
+
+  // Filter employees by selected project
+  const projectEmployees = selectedProject 
+    ? employees.filter(emp => emp.projectId === selectedProject.id)
+    : employees;
+
+  const filteredEmployees = projectEmployees.filter(emp => 
     emp.fullName?.toLowerCase().includes(searchTerm.toLowerCase()) ||
     emp.email?.toLowerCase().includes(searchTerm.toLowerCase()) ||
     emp.employmentId?.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -142,6 +174,24 @@ const HRDashboard = ({ user, onLogout }) => {
     proj.location?.toLowerCase().includes(searchTerm.toLowerCase()) ||
     proj.status?.toLowerCase().includes(searchTerm.toLowerCase())
   );
+
+  // Pagination for Projects
+  const totalProjectPages = Math.ceil(filteredProjects.length / itemsPerPage);
+  const projectStartIndex = (currentProjectPage - 1) * itemsPerPage;
+  const projectEndIndex = projectStartIndex + itemsPerPage;
+  const paginatedProjects = filteredProjects.slice(projectStartIndex, projectEndIndex);
+
+  // Pagination for Employees
+  const totalEmployeePages = Math.ceil(filteredEmployees.length / itemsPerPage);
+  const employeeStartIndex = (currentEmployeePage - 1) * itemsPerPage;
+  const employeeEndIndex = employeeStartIndex + itemsPerPage;
+  const paginatedEmployees = filteredEmployees.slice(employeeStartIndex, employeeEndIndex);
+
+  // Reset to page 1 when search changes
+  useEffect(() => {
+    setCurrentProjectPage(1);
+    setCurrentEmployeePage(1);
+  }, [searchTerm]);
 
   const getStatusColor = (status) => {
     switch (status?.toLowerCase()) {
@@ -189,12 +239,21 @@ const HRDashboard = ({ user, onLogout }) => {
             <p className="text-xs text-gray-600">{user?.position || 'HR Department'}</p>
           </div>
 
+          {/* Current Project Context */}
+          {selectedProject && (
+            <div className="mb-4 p-3 bg-green-50 border border-green-200 rounded-lg">
+              <p className="text-xs text-green-600 font-semibold mb-1">Current Project</p>
+              <p className="text-sm font-semibold text-gray-900">{selectedProject.projectName}</p>
+              <p className="text-xs text-gray-600">{selectedProject.location}</p>
+            </div>
+          )}
+
           {/* Navigation */}
           <div>
-            <p className="text-xs font-semibold text-gray-400 uppercase mb-3">HR Management</p>
+            <p className="text-xs font-semibold text-gray-400 uppercase mb-3 mt-20"></p>
             <nav className="space-y-1">
               <button 
-                onClick={() => setCurrentView('projects')}
+                onClick={handleBackToProjects}
                 className={`w-full flex items-center gap-3 px-4 py-2.5 rounded-lg font-medium ${
                   currentView === 'projects' 
                     ? 'bg-blue-50 text-blue-600' 
@@ -205,17 +264,19 @@ const HRDashboard = ({ user, onLogout }) => {
                 Projects
               </button>
 
-              <button 
-                onClick={() => setCurrentView('employees')}
-                className={`w-full flex items-center gap-3 px-4 py-2.5 rounded-lg font-medium ${
-                  currentView === 'employees' 
-                    ? 'bg-blue-50 text-blue-600' 
-                    : 'text-gray-600 hover:bg-gray-50'
-                }`}
-              >
-                <Users className="w-5 h-5" />
-                Employees
-              </button>
+              {selectedProject && (
+                <button 
+                  onClick={() => setCurrentView('employees')}
+                  className={`w-full flex items-center gap-3 px-4 py-2.5 rounded-lg font-medium ${
+                    currentView === 'employees' 
+                      ? 'bg-blue-50 text-blue-600' 
+                      : 'text-gray-600 hover:bg-gray-50'
+                  }`}
+                >
+                  <Users className="w-5 h-5" />
+                  Employees
+                </button>
+              )}
               
               <button 
                 onClick={() => setCurrentView('archived')}
@@ -228,7 +289,7 @@ const HRDashboard = ({ user, onLogout }) => {
                 <Archive className="w-5 h-5" />
                 Archived
               </button>
-              
+
               <button 
                 onClick={() => setCurrentView('changelogs')}
                 className={`w-full flex items-center gap-3 px-4 py-2.5 rounded-lg font-medium ${
@@ -259,234 +320,384 @@ const HRDashboard = ({ user, onLogout }) => {
       {/* Main Content */}
       <div className="flex-1 flex flex-col overflow-hidden ml-1">
         {currentView === 'archived' ? (
-          <ArchivedPage />
+          <ArchivedPage projects={projects} />
         ) : currentView === 'changelogs' ? (
-          <ChangeLogsPage />
+          <ChangeLogsPage selectedProject={null} />
         ) : currentView === 'projects' ? (
           // Projects List View
-          <div className="flex-1 flex flex-col bg-white">
+          <div className="flex-1 flex flex-col overflow-hidden bg-gray-50">
             {/* Header */}
-            <div className="px-6 py-4 border-b border-gray-200">
-              <div className="flex items-center justify-between mb-4">
-                <h2 className="text-2xl font-bold text-gray-900">Project Management</h2>
-                <button
-                  onClick={() => {
-                    setEditingProject(null);
-                    setShowAddProjectModal(true);
-                  }}
-                  className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
-                >
-                  <Plus className="w-5 h-5" />
-                  Add Project
-                </button>
+            <header className="bg-white border-b border-gray-200 px-8 py-5 flex-shrink-0">
+              <div>
+                <h2 className="text-2xl font-semibold text-gray-900">Projects</h2>
+                <div className="flex items-center gap-2 text-sm text-gray-500 mt-0.5">
+                  <span>HR Management</span>
+                  <span>›</span>
+                  <span className="text-blue-600">Projects</span>
+                </div>
               </div>
-              
-              {/* Search Bar */}
-              <div className="relative">
-                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400" />
-                <input
-                  type="text"
-                  placeholder="Search projects..."
-                  value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
-                  className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                />
-              </div>
-            </div>
+            </header>
 
-            {/* Projects Table */}
-            <div className="flex-1 overflow-auto">
-              {loading ? (
-                <div className="flex items-center justify-center h-full">
-                  <p className="text-gray-500">Loading projects...</p>
+            {/* Content */}
+            <main className="flex-1 flex flex-col overflow-hidden p-8">
+              <div className="flex-1 flex flex-col bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
+                {/* Toolbar */}
+                <div className="p-6 border-b border-gray-200 flex-shrink-0">
+                  <div className="flex items-center justify-between gap-4">
+                    {/* Search */}
+                    <div className="flex-1 max-w-md relative">
+                      <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400" />
+                      <input
+                        type="text"
+                        placeholder="Search projects..."
+                        value={searchTerm}
+                        onChange={(e) => setSearchTerm(e.target.value)}
+                        className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      />
+                    </div>
+
+                    {/* Action Button */}
+                    <button
+                      onClick={() => {
+                        setEditingProject(null);
+                        setShowAddProjectModal(true);
+                      }}
+                      className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+                    >
+                      <Plus className="w-5 h-5" />
+                      Add Project
+                    </button>
+                  </div>
                 </div>
-              ) : filteredProjects.length === 0 ? (
-                <div className="flex items-center justify-center h-full">
-                  <p className="text-gray-500">No projects found</p>
+
+                {/* Scrollable Table Container */}
+                <div className="flex-1 overflow-auto">
+                  {loading ? (
+                    <div className="flex items-center justify-center h-full">
+                      <p className="text-gray-500">Loading projects...</p>
+                    </div>
+                  ) : filteredProjects.length === 0 ? (
+                    <div className="flex items-center justify-center h-full">
+                      <p className="text-gray-500">No projects found</p>
+                    </div>
+                  ) : (
+                    <table className="w-full">
+                      <thead className="bg-white sticky top-0 z-10">
+                        <tr className="border-b border-gray-200">
+                          <th className="pl-8 pr-6 py-4 text-left text-xs font-bold text-gray-700 uppercase tracking-wider">
+                            PROJECT NAME
+                          </th>
+                          <th className="px-6 py-4 text-left text-xs font-bold text-gray-700 uppercase tracking-wider">
+                            LOCATION
+                          </th>
+                          <th className="px-6 py-4 text-left text-xs font-bold text-gray-700 uppercase tracking-wider">
+                            START DATE
+                          </th>
+                          <th className="px-6 py-4 text-left text-xs font-bold text-gray-700 uppercase tracking-wider">
+                            STATUS
+                          </th>
+                          <th className="pl-6 pr-8 py-4 text-left text-xs font-bold text-gray-700 uppercase tracking-wider">
+                            ACTIONS
+                          </th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {paginatedProjects.map((project) => (
+                          <tr key={project.id} className="border-b border-gray-100 hover:bg-gray-50 transition-colors">
+                            <td className="pl-8 pr-6 py-4">
+                              <button
+                                onClick={() => handleProjectClick(project)}
+                                className="text-sm font-medium text-blue-600 hover:text-blue-800 hover:underline transition-colors"
+                              >
+                                {project.projectName}
+                              </button>
+                            </td>
+                            <td className="px-6 py-4">
+                              <div className="text-sm text-gray-500">{project.location}</div>
+                            </td>
+                            <td className="px-6 py-4">
+                              <div className="text-sm text-gray-500">{project.startDate}</div>
+                            </td>
+                            <td className="px-6 py-4">
+                              <span className={`px-2 py-1 text-xs font-semibold rounded-full ${getStatusColor(project.status)}`}>
+                                {project.status}
+                              </span>
+                            </td>
+                            <td className="pl-6 pr-8 py-4">
+                              <div className="flex items-center gap-3">
+                                <button
+                                  onClick={() => handleEditProjectClick(project)}
+                                  className="p-1.5 hover:bg-blue-50 rounded transition-colors"
+                                  title="Edit Project"
+                                >
+                                  <img src={editIcon} alt="Edit" className="w-4 h-4" />
+                                </button>
+                                <button
+                                  onClick={() => handleDeleteProject(project.id)}
+                                  className="p-1.5 hover:bg-red-50 rounded transition-colors"
+                                  title="Delete Project"
+                                >
+                                  <Trash2 className="w-4 h-4 text-gray-500 hover:text-red-600" />
+                                </button>
+                              </div>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  )}
                 </div>
-              ) : (
-                <table className="w-full">
-                  <thead className="bg-gray-50 sticky top-0">
-                    <tr>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                        <input type="checkbox" className="rounded" />
-                      </th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                        Project Name
-                      </th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                        Location
-                      </th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                        Start Date
-                      </th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                        Status
-                      </th>
-                      <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
-                        Actions
-                      </th>
-                    </tr>
-                  </thead>
-                  <tbody className="bg-white divide-y divide-gray-200">
-                    {filteredProjects.map((project) => (
-                      <tr key={project.id} className="hover:bg-gray-50">
-                        <td className="px-6 py-4 whitespace-nowrap">
-                          <input type="checkbox" className="rounded" />
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
-                          {project.projectName}
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                          {project.location}
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                          {project.startDate}
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap">
-                          <span className={`px-2 py-1 text-xs font-semibold rounded-full ${getStatusColor(project.status)}`}>
-                            {project.status}
-                          </span>
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                          <button
-                            onClick={() => handleEditProjectClick(project)}
-                            className="text-blue-600 hover:text-blue-900 mr-4"
-                          >
-                            <Edit2 className="w-4 h-4 inline" />
-                          </button>
-                          <button
-                            onClick={() => handleDeleteProject(project.id)}
-                            className="text-red-600 hover:text-red-900"
-                          >
-                            <Trash2 className="w-4 h-4 inline" />
-                          </button>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              )}
-            </div>
+
+                {/* Fixed Pagination at Bottom */}
+                <div className="px-6 py-4 border-t border-gray-200 flex-shrink-0 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 bg-white">
+                  <div className="text-sm text-gray-600">
+                    {filteredProjects.length > 0 ? (
+                      <>
+                        Showing {projectStartIndex + 1} - {Math.min(projectEndIndex, filteredProjects.length)} of {filteredProjects.length} project{filteredProjects.length !== 1 ? 's' : ''}
+                      </>
+                    ) : (
+                      'No projects'
+                    )}
+                  </div>
+                  
+                  <div className="flex items-center gap-2">
+                    <span className="text-sm text-gray-600">Page</span>
+                    <select 
+                      value={currentProjectPage}
+                      onChange={(e) => setCurrentProjectPage(Number(e.target.value))}
+                      className="px-3 py-1 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    >
+                      {Array.from({ length: totalProjectPages || 1 }, (_, i) => i + 1).map(page => (
+                        <option key={page} value={page}>{page}</option>
+                      ))}
+                    </select>
+                    <span className="text-sm text-gray-600">of {totalProjectPages || 1}</span>
+                    
+                    <button 
+                      onClick={() => setCurrentProjectPage(prev => Math.max(1, prev - 1))}
+                      disabled={currentProjectPage === 1}
+                      className="p-2 border border-gray-300 rounded-lg hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                      title="Previous page"
+                    >
+                      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+                      </svg>
+                    </button>
+                    
+                    <button 
+                      onClick={() => setCurrentProjectPage(prev => Math.min(totalProjectPages || 1, prev + 1))}
+                      disabled={currentProjectPage === (totalProjectPages || 1)}
+                      className="p-2 border border-gray-300 rounded-lg hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                      title="Next page"
+                    >
+                      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                      </svg>
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </main>
           </div>
-        ) : (
-          // Employees List View
-          <div className="flex-1 flex flex-col bg-white">
+        ) : currentView === 'employees' ? (
+          // Employees List View (for selected project)
+          <div className="flex-1 flex flex-col overflow-hidden bg-gray-50">
             {/* Header */}
-            <div className="px-6 py-4 border-b border-gray-200">
-              <div className="flex items-center justify-between mb-4">
-                <h2 className="text-2xl font-bold text-gray-900">Company Employees</h2>
-                <button
-                  onClick={() => {
-                    setEditingEmployee(null);
-                    setShowAddEmployeeForm(true);
-                  }}
-                  className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
-                >
-                  <Plus className="w-5 h-5" />
-                  Add Employee
-                </button>
+            <header className="bg-white border-b border-gray-200 px-8 py-5 flex-shrink-0">
+              <div>
+                <div className="flex items-center gap-3">
+                  <button
+                    onClick={handleBackToProjects}
+                    className="p-1.5 hover:bg-gray-100 rounded-lg transition-colors"
+                    title="Back to Projects"
+                  >
+                    <svg className="w-5 h-5 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+                    </svg>
+                  </button>
+                  <div>
+                    <h2 className="text-2xl font-semibold text-gray-900">
+                      {selectedProject?.projectName || 'Project'} - Employees
+                    </h2>
+                    <div className="flex items-center gap-2 text-sm text-gray-500 mt-0.5">
+                      <span>HR Management</span>
+                      <span>›</span>
+                      <span>Projects</span>
+                      <span>›</span>
+                      <span className="text-blue-600">{selectedProject?.projectName || 'Project'}</span>
+                    </div>
+                  </div>
+                </div>
               </div>
-              
-              {/* Search Bar */}
-              <div className="relative">
-                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400" />
-                <input
-                  type="text"
-                  placeholder="Search employees..."
-                  value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
-                  className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                />
-              </div>
-            </div>
+            </header>
 
-            {/* Employee Table */}
-            <div className="flex-1 overflow-auto">
-              {loading ? (
-                <div className="flex items-center justify-center h-full">
-                  <p className="text-gray-500">Loading employees...</p>
+            {/* Content */}
+            <main className="flex-1 flex flex-col overflow-hidden p-8">
+              <div className="flex-1 flex flex-col bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
+                {/* Toolbar */}
+                <div className="p-6 border-b border-gray-200 flex-shrink-0">
+                  <div className="flex items-center justify-between gap-4">
+                    {/* Search */}
+                    <div className="flex-1 max-w-md relative">
+                      <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400" />
+                      <input
+                        type="text"
+                        placeholder="Search employees..."
+                        value={searchTerm}
+                        onChange={(e) => setSearchTerm(e.target.value)}
+                        className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      />
+                    </div>
+
+                    {/* Action Button */}
+                    <button
+                      onClick={() => {
+                        setEditingEmployee(null);
+                        setShowAddEmployeeForm(true);
+                      }}
+                      className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+                    >
+                      <Plus className="w-5 h-5" />
+                      Add Employee
+                    </button>
+                  </div>
                 </div>
-              ) : filteredEmployees.length === 0 ? (
-                <div className="flex items-center justify-center h-full">
-                  <p className="text-gray-500">No employees found</p>
+
+                {/* Scrollable Table Container */}
+                <div className="flex-1 overflow-auto">
+                  {loading ? (
+                    <div className="flex items-center justify-center h-full">
+                      <p className="text-gray-500">Loading employees...</p>
+                    </div>
+                  ) : filteredEmployees.length === 0 ? (
+                    <div className="flex items-center justify-center h-full">
+                      <p className="text-gray-500">No employees found</p>
+                    </div>
+                  ) : (
+                    <table className="w-full">
+                      <thead className="bg-white sticky top-0 z-10">
+                        <tr className="border-b border-gray-200">
+                          <th className="pl-8 pr-6 py-4 text-left text-xs font-bold text-gray-700 uppercase tracking-wider">
+                            EMPLOYEE ID
+                          </th>
+                          <th className="px-6 py-4 text-left text-xs font-bold text-gray-700 uppercase tracking-wider">
+                            NAME
+                          </th>
+                          <th className="px-6 py-4 text-left text-xs font-bold text-gray-700 uppercase tracking-wider">
+                            EMAIL
+                          </th>
+                          <th className="px-6 py-4 text-left text-xs font-bold text-gray-700 uppercase tracking-wider">
+                            POSITION
+                          </th>
+                          <th className="px-6 py-4 text-left text-xs font-bold text-gray-700 uppercase tracking-wider">
+                            STATUS
+                          </th>
+                          <th className="pl-6 pr-8 py-4 text-left text-xs font-bold text-gray-700 uppercase tracking-wider">
+                            ACTIONS
+                          </th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {paginatedEmployees.map((employee) => (
+                          <tr key={employee.id} className="border-b border-gray-100 hover:bg-gray-50 transition-colors">
+                            <td className="pl-8 pr-6 py-4">
+                              <div className="text-sm text-gray-900">{employee.employmentId}</div>
+                            </td>
+                            <td className="px-6 py-4">
+                              <div className="text-sm font-medium text-gray-900">{employee.fullName}</div>
+                            </td>
+                            <td className="px-6 py-4">
+                              <div className="text-sm text-gray-500">{employee.email}</div>
+                            </td>
+                            <td className="px-6 py-4">
+                              <div className="text-sm text-gray-500">{employee.position}</div>
+                            </td>
+                            <td className="px-6 py-4">
+                              <span className={`px-2 py-1 text-xs font-semibold rounded-full ${
+                                employee.status === 'Regular' 
+                                  ? 'bg-green-100 text-green-800' 
+                                  : 'bg-yellow-100 text-yellow-800'
+                              }`}>
+                                {employee.status}
+                              </span>
+                            </td>
+                            <td className="pl-6 pr-8 py-4">
+                              <div className="flex items-center gap-3">
+                                <button
+                                  onClick={() => handleEditEmployeeClick(employee)}
+                                  className="p-1.5 hover:bg-blue-50 rounded transition-colors"
+                                  title="Edit Employee"
+                                >
+                                  <img src={editIcon} alt="Edit" className="w-4 h-4" />
+                                </button>
+                                <button
+                                  onClick={() => handleDeleteEmployee(employee.id)}
+                                  className="p-1.5 hover:bg-red-50 rounded transition-colors"
+                                  title="Archive Employee"
+                                >
+                                  <Trash2 className="w-4 h-4 text-gray-500 hover:text-red-600" />
+                                </button>
+                              </div>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  )}
                 </div>
-              ) : (
-                <table className="w-full">
-                  <thead className="bg-gray-50 sticky top-0">
-                    <tr>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                        <input type="checkbox" className="rounded" />
-                      </th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                        Employee ID
-                      </th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                        Name
-                      </th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                        Email
-                      </th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                        Position
-                      </th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                        Status
-                      </th>
-                      <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
-                        Actions
-                      </th>
-                    </tr>
-                  </thead>
-                  <tbody className="bg-white divide-y divide-gray-200">
-                    {filteredEmployees.map((employee) => (
-                      <tr key={employee.id} className="hover:bg-gray-50">
-                        <td className="px-6 py-4 whitespace-nowrap">
-                          <input type="checkbox" className="rounded" />
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                          {employee.employmentId}
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
-                          {employee.fullName}
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                          {employee.email}
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                          {employee.position}
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap">
-                          <span className={`px-2 py-1 text-xs font-semibold rounded-full ${
-                            employee.status === 'Regular' 
-                              ? 'bg-green-100 text-green-800' 
-                              : 'bg-yellow-100 text-yellow-800'
-                          }`}>
-                            {employee.status}
-                          </span>
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                          <button
-                            onClick={() => handleEditEmployeeClick(employee)}
-                            className="text-blue-600 hover:text-blue-900 mr-4"
-                          >
-                            <Edit2 className="w-4 h-4 inline" />
-                          </button>
-                          <button
-                            onClick={() => handleDeleteEmployee(employee.id)}
-                            className="text-red-600 hover:text-red-900"
-                          >
-                            <Trash2 className="w-4 h-4 inline" />
-                          </button>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              )}
-            </div>
+
+                {/* Fixed Pagination at Bottom */}
+                <div className="px-6 py-4 border-t border-gray-200 flex-shrink-0 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 bg-white">
+                  <div className="text-sm text-gray-600">
+                    {filteredEmployees.length > 0 ? (
+                      <>
+                        Showing {employeeStartIndex + 1} - {Math.min(employeeEndIndex, filteredEmployees.length)} of {filteredEmployees.length} employee{filteredEmployees.length !== 1 ? 's' : ''}
+                      </>
+                    ) : (
+                      'No employees'
+                    )}
+                  </div>
+                  
+                  <div className="flex items-center gap-2">
+                    <span className="text-sm text-gray-600">Page</span>
+                    <select 
+                      value={currentEmployeePage}
+                      onChange={(e) => setCurrentEmployeePage(Number(e.target.value))}
+                      className="px-3 py-1 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    >
+                      {Array.from({ length: totalEmployeePages || 1 }, (_, i) => i + 1).map(page => (
+                        <option key={page} value={page}>{page}</option>
+                      ))}
+                    </select>
+                    <span className="text-sm text-gray-600">of {totalEmployeePages || 1}</span>
+                    
+                    <button 
+                      onClick={() => setCurrentEmployeePage(prev => Math.max(1, prev - 1))}
+                      disabled={currentEmployeePage === 1}
+                      className="p-2 border border-gray-300 rounded-lg hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                      title="Previous page"
+                    >
+                      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+                      </svg>
+                    </button>
+                    
+                    <button 
+                      onClick={() => setCurrentEmployeePage(prev => Math.min(totalEmployeePages || 1, prev + 1))}
+                      disabled={currentEmployeePage === (totalEmployeePages || 1)}
+                      className="p-2 border border-gray-300 rounded-lg hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                      title="Next page"
+                    >
+                      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                      </svg>
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </main>
           </div>
-        )}
+        ) : null}
       </div>
 
       {/* Add/Edit Employee Modal */}

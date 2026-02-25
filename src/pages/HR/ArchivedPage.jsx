@@ -1,13 +1,15 @@
 import React, { useState, useEffect } from 'react';
-import { Search, Filter, Download, Menu, RotateCcw, Trash2 } from 'lucide-react';
+import { Search, Filter, Download, RotateCcw, Trash2 } from 'lucide-react';
 import { getEmployees, restoreEmployee, deleteEmployee } from '../../services/employeeService';
 
-const ArchivedPage = ({ onNavigate }) => {
-  const [selectedEmployees, setSelectedEmployees] = useState([]);
+const ArchivedPage = ({ onNavigate, projects }) => {
   const [searchQuery, setSearchQuery] = useState('');
   const [currentPage, setCurrentPage] = useState(1);
   const [archivedEmployees, setArchivedEmployees] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [showRestoreModal, setShowRestoreModal] = useState(false);
+  const [restoringEmployee, setRestoringEmployee] = useState(null);
+  const [selectedProjectId, setSelectedProjectId] = useState('');
 
   // Load archived employees from Firebase
   useEffect(() => {
@@ -26,16 +28,34 @@ const ArchivedPage = ({ onNavigate }) => {
     loadArchivedEmployees();
   }, []);
 
-  const handleRestore = async (id) => {
-    if (window.confirm('Are you sure you want to restore this employee?')) {
-      try {
-        await restoreEmployee(id);
-        setArchivedEmployees(archivedEmployees.filter(emp => emp.id !== id));
-        alert('Employee restored successfully');
-      } catch (error) {
-        console.error('Error restoring employee:', error);
-        alert('Failed to restore employee. Please try again.');
-      }
+  const handleRestore = async (employee) => {
+    // Show modal to select project
+    setRestoringEmployee(employee);
+    setShowRestoreModal(true);
+  };
+
+  const handleConfirmRestore = async () => {
+    if (!selectedProjectId) {
+      alert('Please select a project');
+      return;
+    }
+
+    try {
+      // Restore employee and assign to selected project
+      await restoreEmployee(restoringEmployee.id);
+      
+      // Update employee with new projectId
+      const { updateEmployee } = await import('../../services/employeeService');
+      await updateEmployee(restoringEmployee.id, { projectId: selectedProjectId });
+      
+      setArchivedEmployees(archivedEmployees.filter(emp => emp.id !== restoringEmployee.id));
+      setShowRestoreModal(false);
+      setRestoringEmployee(null);
+      setSelectedProjectId('');
+      alert('Employee restored successfully!');
+    } catch (error) {
+      console.error('Error restoring employee:', error);
+      alert('Failed to restore employee. Please try again.');
     }
   };
 
@@ -52,34 +72,19 @@ const ArchivedPage = ({ onNavigate }) => {
     }
   };
 
-  const handleSelectEmployee = (id) => {
-    setSelectedEmployees(prev => 
-      prev.includes(id) 
-        ? prev.filter(empId => empId !== id)
-        : [...prev, id]
-    );
-  };
-
-  const handleSelectAll = () => {
-    if (selectedEmployees.length === archivedEmployees.length) {
-      setSelectedEmployees([]);
-    } else {
-      setSelectedEmployees(archivedEmployees.map(emp => emp.id));
-    }
-  };
-
   const handleExport = () => {
     alert('Exporting archived employee data...');
   };
 
-  const filteredEmployees = archivedEmployees.filter(emp =>
-    (emp.name?.toLowerCase() || '').includes(searchQuery.toLowerCase()) ||
-    (emp.fullName?.toLowerCase() || '').includes(searchQuery.toLowerCase()) ||
-    (emp.id?.toLowerCase() || '').includes(searchQuery.toLowerCase()) ||
-    (emp.employmentId?.toLowerCase() || '').includes(searchQuery.toLowerCase()) ||
-    (emp.contact?.toLowerCase() || '').includes(searchQuery.toLowerCase()) ||
-    (emp.email?.toLowerCase() || '').includes(searchQuery.toLowerCase())
-  );
+  const filteredEmployees = archivedEmployees
+    .filter(emp =>
+      (emp.name?.toLowerCase() || '').includes(searchQuery.toLowerCase()) ||
+      (emp.fullName?.toLowerCase() || '').includes(searchQuery.toLowerCase()) ||
+      (emp.id?.toLowerCase() || '').includes(searchQuery.toLowerCase()) ||
+      (emp.employmentId?.toLowerCase() || '').includes(searchQuery.toLowerCase()) ||
+      (emp.contact?.toLowerCase() || '').includes(searchQuery.toLowerCase()) ||
+      (emp.email?.toLowerCase() || '').includes(searchQuery.toLowerCase())
+    );
 
   const totalPages = 13;
 
@@ -89,16 +94,10 @@ const ArchivedPage = ({ onNavigate }) => {
       <header className="bg-white border-b border-gray-200 px-8 py-5">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-4">
-            <button 
-              onClick={() => onNavigate && onNavigate('employees')}
-              className="p-2 hover:bg-gray-100 rounded-lg"
-            >
-              <Menu className="w-5 h-5 text-gray-600" />
-            </button>
             <div>
-              <h1 className="text-2xl font-semibold text-gray-900">Archived</h1>
+              <h1 className="text-2xl font-semibold text-gray-900">Archived Employees</h1>
               <div className="flex items-center gap-2 text-sm text-gray-500 mt-0.5">
-                <span>General</span>
+                <span>HR Management</span>
                 <span>›</span>
                 <span className="text-blue-600">Archived</span>
               </div>
@@ -108,10 +107,10 @@ const ArchivedPage = ({ onNavigate }) => {
       </header>
 
       {/* Content */}
-      <main className="flex-1 overflow-auto p-8">
-        <div className="bg-white rounded-lg shadow-sm border border-gray-200">
+      <main className="flex-1 flex flex-col overflow-hidden p-8">
+        <div className="flex-1 flex flex-col bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
           {/* Toolbar */}
-          <div className="p-6 border-b border-gray-200">
+          <div className="p-6 border-b border-gray-200 flex-shrink-0">
             <div className="flex items-center justify-between gap-4">
               {/* Search */}
               <div className="flex-1 max-w-md relative">
@@ -146,21 +145,16 @@ const ArchivedPage = ({ onNavigate }) => {
             </div>
           </div>
 
-          {/* Table */}
-          <div className="overflow-x-auto">
+          {/* Scrollable Table Container */}
+          <div className="flex-1 overflow-auto">
             <table className="w-full">
-              <thead>
-                <tr className="border-b border-gray-200 bg-white">
-                  <th className="px-6 py-4 text-left w-12">
-                    <input
-                      type="checkbox"
-                      checked={selectedEmployees.length === archivedEmployees.length}
-                      onChange={handleSelectAll}
-                      className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
-                    />
-                  </th>
+              <thead className="bg-white sticky top-0 z-10">
+                <tr className="border-b border-gray-200">
                   <th className="px-6 py-4 text-left text-xs font-bold text-gray-700 uppercase tracking-wider">
                     EMPLOYEE
+                  </th>
+                  <th className="px-6 py-4 text-left text-xs font-bold text-gray-700 uppercase tracking-wider">
+                    PROJECT
                   </th>
                   <th className="px-6 py-4 text-left text-xs font-bold text-gray-700 uppercase tracking-wider">
                     CONTACT
@@ -180,23 +174,16 @@ const ArchivedPage = ({ onNavigate }) => {
                 {filteredEmployees.map((employee, index) => (
                   <tr key={employee.id || index} className="border-b border-gray-100 hover:bg-gray-50 transition-colors">
                     <td className="px-6 py-4">
-                      <input
-                        type="checkbox"
-                        checked={selectedEmployees.includes(employee.id)}
-                        onChange={() => handleSelectEmployee(employee.id)}
-                        className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
-                      />
-                    </td>
-                    <td className="px-6 py-4">
                       <div>
-                        {/*<div className="text-sm font-semibold text-blue-600 mb-0.5">
-                          {employee.employmentId || 'N/A'}
-                        </div>
-                        */}
                         <div className="text-sm text-gray-900 font-medium">
                           {employee.fullName || employee.name || 'No Name'}
                         </div>
                       </div>
+                    </td>
+                    <td className="px-6 py-4">
+                      <span className="text-sm text-gray-600">
+                        {projects?.find(p => p.id === employee.projectId)?.projectName || 'Unassigned'}
+                      </span>
                     </td>
                     <td className="px-6 py-4">
                       <div>
@@ -213,7 +200,7 @@ const ArchivedPage = ({ onNavigate }) => {
                     <td className="px-6 py-4">
                       <div className="flex items-center gap-3">
                         <button 
-                          onClick={() => handleRestore(employee.id)}
+                          onClick={() => handleRestore(employee)}
                           className="p-1.5 hover:bg-green-50 rounded transition-colors"
                           title="Restore Employee"
                         >
@@ -234,8 +221,8 @@ const ArchivedPage = ({ onNavigate }) => {
             </table>
           </div>
 
-          {/* Pagination */}
-          <div className="px-6 py-4 border-t border-gray-200 flex items-center justify-between">
+          {/* Fixed Pagination at Bottom */}
+          <div className="px-6 py-4 border-t border-gray-200 flex-shrink-0 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 bg-white">
             <div className="text-sm text-gray-600">
               1 - 10 of {totalPages} Pages
             </div>
@@ -268,6 +255,53 @@ const ArchivedPage = ({ onNavigate }) => {
           </div>
         </div>
       </main>
+
+      {/* Restore Modal */}
+      {showRestoreModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg shadow-xl p-6 w-full max-w-md">
+            <h3 className="text-lg font-semibold text-gray-900 mb-4">
+              Restore Employee
+            </h3>
+            <p className="text-sm text-gray-600 mb-4">
+              Select a project to assign <span className="font-semibold">{restoringEmployee?.fullName || restoringEmployee?.name}</span> to:
+            </p>
+            
+            <select
+              value={selectedProjectId}
+              onChange={(e) => setSelectedProjectId(e.target.value)}
+              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 mb-6"
+            >
+              <option value="">Select a project...</option>
+              {projects?.map(project => (
+                <option key={project.id} value={project.id}>
+                  {project.projectName} - {project.location}
+                </option>
+              ))}
+            </select>
+
+            <div className="flex gap-3">
+              <button
+                onClick={() => {
+                  setShowRestoreModal(false);
+                  setRestoringEmployee(null);
+                  setSelectedProjectId('');
+                }}
+                className="flex-1 px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleConfirmRestore}
+                disabled={!selectedProjectId}
+                className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                Restore
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

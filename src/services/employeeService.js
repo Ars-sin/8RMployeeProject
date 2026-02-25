@@ -47,6 +47,7 @@ export const addEmployee = async (employeeData, contractFile = null) => {
       employeeId: docRef.id,
       employeeName: employeeData.fullName,
       performedBy: 'Admin',
+      projectId: employeeData.projectId || null, // Include projectId
       details: {
         position: employeeData.position,
         employmentId: employeeData.employmentId
@@ -116,6 +117,7 @@ export const updateEmployee = async (employeeId, updates, contractFile = null) =
       employeeId: employeeId,
       employeeName: updates.fullName,
       performedBy: 'Admin',
+      projectId: updates.projectId || null, // Include projectId
       details: {
         updatedFields: Object.keys(updates)
       }
@@ -131,9 +133,13 @@ export const updateEmployee = async (employeeId, updates, contractFile = null) =
 // Archive employee (soft delete)
 export const archiveEmployee = async (employeeId) => {
   try {
-    // Get employee data first for logging
-    const employees = await getEmployees();
+    // Get employee data first for logging (before archiving)
+    const employees = await getEmployees(false); // Get only active employees
     const employee = employees.find(emp => emp.id === employeeId);
+    
+    if (!employee) {
+      throw new Error('Employee not found');
+    }
     
     const employeeRef = doc(db, EMPLOYEES_COLLECTION, employeeId);
     await updateDoc(employeeRef, {
@@ -142,7 +148,7 @@ export const archiveEmployee = async (employeeId) => {
       updatedAt: Timestamp.now()
     });
     
-    // Log the activity
+    // Log the activity with projectId
     await addChangeLog({
       type: LOG_TYPES.EMPLOYEE_ARCHIVED,
       action: 'Archive',
@@ -150,6 +156,7 @@ export const archiveEmployee = async (employeeId) => {
       employeeId: employeeId,
       employeeName: employee?.fullName,
       performedBy: 'Admin',
+      projectId: employee?.projectId || null, // Include projectId from employee data
       details: {
         employmentId: employee?.employmentId,
         position: employee?.position
@@ -183,6 +190,7 @@ export const restoreEmployee = async (employeeId) => {
       employeeId: employeeId,
       employeeName: employee?.fullName,
       performedBy: 'Admin',
+      projectId: employee?.projectId || null, // Include projectId
       details: {
         employmentId: employee?.employmentId,
         position: employee?.position
@@ -211,6 +219,7 @@ export const deleteEmployee = async (employeeId) => {
       employeeId: employeeId,
       employeeName: employee?.fullName,
       performedBy: 'Admin',
+      projectId: employee?.projectId || null, // Include projectId
       details: {
         employmentId: employee?.employmentId,
         position: employee?.position,

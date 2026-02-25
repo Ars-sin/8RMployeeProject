@@ -1,9 +1,10 @@
 import React, { useState, useEffect } from 'react';
-import { Menu, Users, Archive, ClipboardList, Shield, LogOut, Plus, Edit2, Trash2, Search } from 'lucide-react';
+import { Menu, Users, Archive, ClipboardList, Shield, LogOut, Plus, Trash2, Search, Filter, Download } from 'lucide-react';
 import AdminArchived from './AdminArchived';
 import AdminChangeLogs from './AdminChangeLogs';
 import AddAdminModal from './AddAdminModal';
-import { getAdmins, addAdmin, updateAdmin, deleteAdmin } from '../../services/adminService';
+import { getAdmins, addAdmin, updateAdmin, archiveAdmin } from '../../services/adminService';
+import editIcon from '../../Components/ui/edit.png';
 
 
 const AdminDashboard = ({ onLogout }) => {
@@ -14,6 +15,8 @@ const AdminDashboard = ({ onLogout }) => {
   const [showAddAdminModal, setShowAddAdminModal] = useState(false);
   const [editingAdmin, setEditingAdmin] = useState(null);
   const [searchTerm, setSearchTerm] = useState('');
+  const [currentPage, setCurrentPage] = useState(1);
+  const itemsPerPage = 10;
 
   // Load admins
   useEffect(() => {
@@ -58,14 +61,14 @@ const AdminDashboard = ({ onLogout }) => {
   };
 
   const handleDeleteAdmin = async (adminId) => {
-    if (window.confirm('Are you sure you want to delete this admin?')) {
+    if (window.confirm('Are you sure you want to archive this admin?')) {
       try {
-        await deleteAdmin(adminId);
+        await archiveAdmin(adminId);
         await loadAdmins();
-        alert('Admin deleted successfully!');
+        alert('Admin archived successfully!');
       } catch (error) {
-        console.error('Error deleting admin:', error);
-        alert('Failed to delete admin');
+        console.error('Error archiving admin:', error);
+        alert('Failed to archive admin');
       }
     }
   };
@@ -81,6 +84,17 @@ const AdminDashboard = ({ onLogout }) => {
     admin.idNumber?.toLowerCase().includes(searchTerm.toLowerCase()) ||
     admin.position?.toLowerCase().includes(searchTerm.toLowerCase())
   );
+
+  // Pagination calculations
+  const totalPages = Math.ceil(filteredAdmins.length / itemsPerPage);
+  const startIndex = (currentPage - 1) * itemsPerPage;
+  const endIndex = startIndex + itemsPerPage;
+  const paginatedAdmins = filteredAdmins.slice(startIndex, endIndex);
+
+  // Reset to page 1 when search changes
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchTerm]);
 
   return (
     <div className="flex h-screen bg-gray-50">
@@ -105,7 +119,7 @@ const AdminDashboard = ({ onLogout }) => {
 
           {/* Navigation */}
           <div>
-            <p className="text-xs font-semibold text-gray-400 uppercase mb-3">Settings</p>
+            <p className="text-xs font-semibold text-gray-400 uppercase mb-3 mt-20Admin"></p>
             <nav className="space-y-1">
               <button 
                 onClick={() => setCurrentView('admins')}
@@ -166,108 +180,188 @@ const AdminDashboard = ({ onLogout }) => {
           <AdminChangeLogs />
         ) : (
           // Admin List View
-          <div className="flex-1 flex flex-col bg-white">
+          <div className="flex-1 flex flex-col overflow-hidden bg-gray-50">
             {/* Header */}
-            <div className="px-6 py-4 border-b border-gray-200">
-              <div className="flex items-center justify-between mb-4">
-                <h2 className="text-2xl font-bold text-gray-900">Admin Management</h2>
-                <button
-                  onClick={() => {
-                    setEditingAdmin(null);
-                    setShowAddAdminModal(true);
-                  }}
-                  className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
-                >
-                  <Plus className="w-5 h-5" />
-                  Add Admin
-                </button>
+            <header className="bg-white border-b border-gray-200 px-8 py-5 flex-shrink-0">
+              <div>
+                <h1 className="text-2xl font-semibold text-gray-900">Admins</h1>
+                <div className="flex items-center gap-2 text-sm text-gray-500 mt-0.5">
+                  <span>General</span>
+                  <span>›</span>
+                  <span className="text-blue-600">Admins</span>
+                </div>
               </div>
-              
-              {/* Search Bar */}
-              <div className="relative">
-                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400" />
-                <input
-                  type="text"
-                  placeholder="Search for id, name Customer"
-                  value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
-                  className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                />
-              </div>
-            </div>
+            </header>
 
-            {/* Admin Table */}
-            <div className="flex-1 overflow-auto">
-              {loading ? (
-                <div className="flex items-center justify-center h-full">
-                  <p className="text-gray-500">Loading admins...</p>
+            {/* Content */}
+            <main className="flex-1 flex flex-col overflow-hidden p-8">
+              <div className="flex-1 flex flex-col bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
+                {/* Toolbar */}
+                <div className="p-6 border-b border-gray-200 flex-shrink-0">
+                  <div className="flex items-center justify-between gap-4">
+                    {/* Search */}
+                    <div className="flex-1 max-w-md relative">
+                      <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
+                      <input
+                        type="text"
+                        placeholder="Search for id, name Customer"
+                        value={searchTerm}
+                        onChange={(e) => setSearchTerm(e.target.value)}
+                        className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                      />
+                    </div>
+
+                    {/* Action Buttons */}
+                    <div className="flex items-center gap-3">
+                      <button 
+                        className="flex items-center gap-2 px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 font-medium"
+                      >
+                        <Filter className="w-4 h-4" />
+                        Filter
+                      </button>
+                      
+                      <button 
+                        className="flex items-center gap-2 px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 font-medium"
+                      >
+                        <Download className="w-4 h-4" />
+                        Export
+                      </button>
+
+                      <button
+                        onClick={() => {
+                          setEditingAdmin(null);
+                          setShowAddAdminModal(true);
+                        }}
+                        className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-medium"
+                      >
+                        <Plus className="w-5 h-5" />
+                        Add Admin
+                      </button>
+                    </div>
+                  </div>
                 </div>
-              ) : filteredAdmins.length === 0 ? (
-                <div className="flex items-center justify-center h-full">
-                  <p className="text-gray-500">No admins found</p>
+
+                {/* Scrollable Table Container */}
+                <div className="flex-1 overflow-auto">
+                  {loading ? (
+                    <div className="flex items-center justify-center h-full">
+                      <p className="text-gray-500">Loading admins...</p>
+                    </div>
+                  ) : filteredAdmins.length === 0 ? (
+                    <div className="flex items-center justify-center h-full">
+                      <p className="text-gray-500">No admins found</p>
+                    </div>
+                  ) : (
+                    <table className="w-full">
+                      <thead className="bg-white sticky top-0 z-10">
+                        <tr className="border-b border-gray-200">
+                          <th className="pl-8 pr-6 py-4 text-left text-xs font-bold text-gray-700 uppercase tracking-wider">
+                            ADMIN
+                          </th>
+                          <th className="px-6 py-4 text-left text-xs font-bold text-gray-700 uppercase tracking-wider">
+                            ID
+                          </th>
+                          <th className="px-6 py-4 text-left text-xs font-bold text-gray-700 uppercase tracking-wider">
+                            GMAIL
+                          </th>
+                          <th className="px-6 py-4 text-left text-xs font-bold text-gray-700 uppercase tracking-wider">
+                            POSITION
+                          </th>
+                          <th className="pl-6 pr-8 py-4 text-left text-xs font-bold text-gray-700 uppercase tracking-wider">
+                            ACTION
+                          </th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {paginatedAdmins.map((admin) => (
+                          <tr key={admin.id} className="border-b border-gray-100 hover:bg-gray-50 transition-colors">
+                            <td className="pl-8 pr-6 py-4">
+                              <div className="text-sm text-gray-900">{admin.fullName}</div>
+                            </td>
+                            <td className="px-6 py-4">
+                              <div className="text-sm text-gray-900">{admin.idNumber}</div>
+                            </td>
+                            <td className="px-6 py-4">
+                              <div className="text-sm text-gray-900">{admin.email}</div>
+                            </td>
+                            <td className="px-6 py-4">
+                              <span className="text-sm text-gray-700">{admin.position}</span>
+                            </td>
+                            <td className="pl-6 pr-8 py-4">
+                              <div className="flex items-center gap-3">
+                                <button
+                                  onClick={() => handleEditClick(admin)}
+                                  className="p-1.5 hover:bg-blue-50 rounded transition-colors"
+                                  title="Edit Admin"
+                                >
+                                  <img src={editIcon} alt="Edit" className="w-4 h-4" />
+                                </button>
+                                <button
+                                  onClick={() => handleDeleteAdmin(admin.id)}
+                                  className="p-1.5 hover:bg-red-50 rounded transition-colors"
+                                  title="Archive Admin"
+                                >
+                                  <Trash2 className="w-4 h-4 text-gray-500 hover:text-red-600" />
+                                </button>
+                              </div>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  )}
                 </div>
-              ) : (
-                <table className="w-full">
-                  <thead className="bg-gray-50 sticky top-0">
-                    <tr>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                        <input type="checkbox" className="rounded" />
-                      </th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                        Admin
-                      </th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                        ID
-                      </th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                        Gmail
-                      </th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                        Position
-                      </th>
-                      <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
-                        Action
-                      </th>
-                    </tr>
-                  </thead>
-                  <tbody className="bg-white divide-y divide-gray-200">
-                    {filteredAdmins.map((admin) => (
-                      <tr key={admin.id} className="hover:bg-gray-50">
-                        <td className="px-6 py-4 whitespace-nowrap">
-                          <input type="checkbox" className="rounded" />
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
-                          {admin.fullName}
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-blue-600">
-                          {admin.idNumber}
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                          {admin.email}
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                          {admin.position}
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                          <button
-                            onClick={() => handleEditClick(admin)}
-                            className="text-blue-600 hover:text-blue-900 mr-4"
-                          >
-                            <Edit2 className="w-4 h-4 inline" />
-                          </button>
-                          <button
-                            onClick={() => handleDeleteAdmin(admin.id)}
-                            className="text-red-600 hover:text-red-900"
-                          >
-                            <Trash2 className="w-4 h-4 inline" />
-                          </button>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              )}
-            </div>
+
+                {/* Fixed Pagination at Bottom */}
+                <div className="px-6 py-4 border-t border-gray-200 flex-shrink-0 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 bg-white">
+                  <div className="text-sm text-gray-600">
+                    {filteredAdmins.length > 0 ? (
+                      <>
+                        Showing {startIndex + 1} - {Math.min(endIndex, filteredAdmins.length)} of {filteredAdmins.length} admin{filteredAdmins.length !== 1 ? 's' : ''}
+                      </>
+                    ) : (
+                      'No admins'
+                    )}
+                  </div>
+                  
+                  <div className="flex items-center gap-2">
+                    <span className="text-sm text-gray-600">Page</span>
+                    <select 
+                      value={currentPage}
+                      onChange={(e) => setCurrentPage(Number(e.target.value))}
+                      className="px-3 py-1 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    >
+                      {Array.from({ length: totalPages || 1 }, (_, i) => i + 1).map(page => (
+                        <option key={page} value={page}>{page}</option>
+                      ))}
+                    </select>
+                    <span className="text-sm text-gray-600">of {totalPages || 1}</span>
+                    
+                    <button 
+                      onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
+                      disabled={currentPage === 1}
+                      className="p-2 border border-gray-300 rounded-lg hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                      title="Previous page"
+                    >
+                      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+                      </svg>
+                    </button>
+                    
+                    <button 
+                      onClick={() => setCurrentPage(prev => Math.min(totalPages || 1, prev + 1))}
+                      disabled={currentPage === (totalPages || 1)}
+                      className="p-2 border border-gray-300 rounded-lg hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                      title="Next page"
+                    >
+                      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                      </svg>
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </main>
           </div>
         )}
       </div>

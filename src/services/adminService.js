@@ -3,10 +3,15 @@ import { collection, addDoc, getDocs, doc, updateDoc, deleteDoc, query, where, T
 import { addChangeLog, LOG_TYPES, createLogDescription } from './changeLogService';
 
 // Get all admins
-export const getAdmins = async () => {
+export const getAdmins = async (includeArchived = false) => {
   try {
-    const adminsRef = collection(db, 'admins');
-    const snapshot = await getDocs(adminsRef);
+    let q = collection(db, 'admins');
+    
+    if (!includeArchived) {
+      q = query(q, where('isArchived', '==', false));
+    }
+    
+    const snapshot = await getDocs(q);
     return snapshot.docs.map(doc => ({
       id: doc.id,
       ...doc.data()
@@ -24,7 +29,8 @@ export const addAdmin = async (adminData) => {
     const docRef = await addDoc(adminsRef, {
       ...adminData,
       createdAt: Timestamp.now(),
-      updatedAt: Timestamp.now()
+      updatedAt: Timestamp.now(),
+      isArchived: false
     });
     
     // Log the change
@@ -76,14 +82,78 @@ export const updateAdmin = async (adminId, adminData) => {
   }
 };
 
-// Delete admin
+// Archive admin (soft delete)
+export const archiveAdmin = async (adminId) => {
+  try {
+    // Get admin data first for logging
+    const admins = await getAdmins();
+    const admin = admins.find(adm => adm.id === adminId);
+    
+    const adminRef = doc(db, 'admins', adminId);
+    await updateDoc(adminRef, {
+      isArchived: true,
+      archivedAt: Timestamp.now(),
+      updatedAt: Timestamp.now()
+    });
+    
+    // Log the activity
+    await addChangeLog({
+      type: 'admin_archived',
+      action: 'archived',
+      description: `Archived admin: ${admin?.fullName || 'Unknown'}`,
+      employeeId: adminId,
+      employeeName: admin?.fullName || 'Unknown',
+      performedBy: 'Super Admin',
+      details: {
+        position: admin?.position,
+        email: admin?.email
+      }
+    });
+  } catch (error) {
+    console.error('Error archiving admin:', error);
+    throw error;
+  }
+};
+
+// Restore archived admin
+export const restoreAdmin = async (adminId) => {
+  try {
+    // Get admin data first for logging
+    const admins = await getAdmins(true);
+    const admin = admins.find(adm => adm.id === adminId);
+    
+    const adminRef = doc(db, 'admins', adminId);
+    await updateDoc(adminRef, {
+      isArchived: false,
+      archivedAt: null,
+      updatedAt: Timestamp.now()
+    });
+    
+    // Log the activity
+    await addChangeLog({
+      type: 'admin_restored',
+      action: 'restored',
+      description: `Restored admin: ${admin?.fullName || 'Unknown'}`,
+      employeeId: adminId,
+      employeeName: admin?.fullName || 'Unknown',
+      performedBy: 'Super Admin',
+      details: {
+        position: admin?.position,
+        email: admin?.email
+      }
+    });
+  } catch (error) {
+    console.error('Error restoring admin:', error);
+    throw error;
+  }
+};
+
+// Delete admin permanently
 export const deleteAdmin = async (adminId) => {
   try {
     // Get admin data before deleting for logging
-    const adminsRef = collection(db, 'admins');
-    const snapshot = await getDocs(adminsRef);
-    const adminDoc = snapshot.docs.find(doc => doc.id === adminId);
-    const adminData = adminDoc ? adminDoc.data() : {};
+    const admins = await getAdmins(true);
+    const admin = admins.find(adm => adm.id === adminId);
     
     const adminRef = doc(db, 'admins', adminId);
     await deleteDoc(adminRef);
@@ -92,13 +162,14 @@ export const deleteAdmin = async (adminId) => {
     await addChangeLog({
       type: 'admin_deleted',
       action: 'deleted',
-      description: `Deleted admin: ${adminData.fullName || 'Unknown'}`,
+      description: `Permanently deleted admin: ${admin?.fullName || 'Unknown'}`,
       employeeId: adminId,
-      employeeName: adminData.fullName || 'Unknown',
+      employeeName: admin?.fullName || 'Unknown',
       performedBy: 'Super Admin',
       details: {
-        position: adminData.position,
-        email: adminData.email
+        position: admin?.position,
+        email: admin?.email,
+        warning: 'Permanently deleted from database'
       }
     });
   } catch (error) {
@@ -125,6 +196,44 @@ export const getAdminByEmail = async (email) => {
     };
   } catch (error) {
     console.error('Error getting admin by email:', error);
+    throw error;
+  }
+};
+
+// Check for duplicate email or position
+export const checkDuplicateAdmin = async (email, position, excludeAdminId = null) => {
+  try {
+    const admins = await getAdmins(false); // Only check active admins
+    
+    const duplicates = {
+      email: false,
+      position: false,
+      emailAdmin: null,
+      positionAdmin: null
+    };
+    
+    for (const admin of admins) {
+      // Skip the admin being edited
+      if (excludeAdminId && admin.id === excludeAdminId) {
+        continue;
+      }
+      
+      // Check for duplicate email
+      if (admin.email.toLowerCase() === email.toLowerCase()) {
+        duplicates.email = true;
+        duplicates.emailAdmin = admin.fullName;
+      }
+      
+      // Check for duplicate position
+      if (admin.position.toLowerCase() === position.toLowerCase()) {
+        duplicates.position = true;
+        duplicates.positionAdmin = admin.fullName;
+      }
+    }
+    
+    return duplicates;
+  } catch (error) {
+    console.error('Error checking duplicate admin:', error);
     throw error;
   }
 };

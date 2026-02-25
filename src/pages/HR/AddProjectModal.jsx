@@ -13,6 +13,7 @@ const AddProjectModal = ({ project, onClose, onSave }) => {
   });
 
   const [errors, setErrors] = useState({});
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   useEffect(() => {
     if (project) {
@@ -65,11 +66,17 @@ const AddProjectModal = ({ project, onClose, onSave }) => {
     return Object.keys(newErrors).length === 0;
   };
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
     
-    if (validateForm()) {
-      onSave(formData);
+    if (validateForm() && !isSubmitting) {
+      setIsSubmitting(true);
+      try {
+        await onSave(formData);
+      } catch (error) {
+        console.error('Error saving project:', error);
+        setIsSubmitting(false);
+      }
     }
   };
 
@@ -214,9 +221,10 @@ const AddProjectModal = ({ project, onClose, onSave }) => {
           <div className="pt-4">
             <button
               type="submit"
-              className="w-full px-6 py-3 bg-blue-600 text-white rounded-lg font-semibold hover:bg-blue-700 transition-colors"
+              disabled={isSubmitting}
+              className="w-full px-6 py-3 bg-blue-600 text-white rounded-lg font-semibold hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              {project ? 'Update Project' : 'Add Project'}
+              {isSubmitting ? 'Saving...' : (project ? 'Update Project' : 'Add Project')}
             </button>
           </div>
         </form>

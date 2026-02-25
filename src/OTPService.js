@@ -25,7 +25,7 @@ export const sendOTP = async (email) => {
     return data;
   } catch (error) {
     console.error('Send OTP error:', error);
-    return { success: false, message: 'Cannot connect to server. Make sure API is running on port 3001.' };
+    return { success: false, message: 'Cannot connect to server. Make sure API is running on port 3002.' };
   }
 };
 

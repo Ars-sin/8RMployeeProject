@@ -1,8 +1,8 @@
-import React, { useState, useEffect } from 'react';
-import { Search, Filter, ChevronDown, RefreshCw } from 'lucide-react';
+import { useState, useEffect } from 'react';
+import { Search, ChevronDown, RefreshCw } from 'lucide-react';
 import { getChangeLogs, formatLogTimestamp } from '../../services/changeLogService';
 
-const AdminChangeLogs = () => {
+const AccountingChangeLogs = () => {
   const [searchQuery, setSearchQuery] = useState('');
   const [changeLogs, setChangeLogs] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -18,13 +18,12 @@ const AdminChangeLogs = () => {
     try {
       setLoading(true);
       const logs = await getChangeLogs();
-      // Filter only admin-related logs
-      const adminLogs = logs.filter(log => 
-        log.type?.includes('admin_') || 
-        log.action === 'admin' ||
-        log.description?.toLowerCase().includes('admin')
+      // Filter only employee-related logs (exclude admin logs)
+      const employeeLogs = logs.filter(log => 
+        log.type?.includes('employee_') || 
+        (!log.type?.includes('admin_') && !log.description?.toLowerCase().includes('admin'))
       );
-      setChangeLogs(adminLogs);
+      setChangeLogs(employeeLogs);
     } catch (error) {
       console.error('Error loading change logs:', error);
     } finally {
@@ -35,6 +34,8 @@ const AdminChangeLogs = () => {
   const getActionBadgeColor = (type) => {
     if (type?.includes('added')) return 'bg-green-100 text-green-800';
     if (type?.includes('updated')) return 'bg-blue-100 text-blue-800';
+    if (type?.includes('archived')) return 'bg-orange-100 text-orange-800';
+    if (type?.includes('restored')) return 'bg-purple-100 text-purple-800';
     if (type?.includes('deleted')) return 'bg-red-100 text-red-800';
     return 'bg-gray-100 text-gray-800';
   };
@@ -42,6 +43,8 @@ const AdminChangeLogs = () => {
   const getActionLabel = (type) => {
     if (type?.includes('added')) return 'Added';
     if (type?.includes('updated')) return 'Updated';
+    if (type?.includes('archived')) return 'Archived';
+    if (type?.includes('restored')) return 'Restored';
     if (type?.includes('deleted')) return 'Deleted';
     return type || 'Action';
   };
@@ -58,38 +61,32 @@ const AdminChangeLogs = () => {
     return matchesSearch && matchesFilter;
   });
 
-  // Pagination calculations
   const totalPages = Math.ceil(filteredLogs.length / itemsPerPage);
   const startIndex = (currentPage - 1) * itemsPerPage;
   const endIndex = startIndex + itemsPerPage;
   const paginatedLogs = filteredLogs.slice(startIndex, endIndex);
 
-  // Reset to page 1 when search or filter changes
   useEffect(() => {
     setCurrentPage(1);
   }, [searchQuery, filterType]);
 
   return (
     <>
-      {/* Header */}
       <header className="bg-white border-b border-gray-200 px-8 py-5">
         <div>
           <h1 className="text-2xl font-semibold text-gray-900">Change Logs</h1>
           <div className="flex items-center gap-2 text-sm text-gray-500 mt-0.5">
-            <span>Settings</span>
+            <span>Accounting</span>
             <span>›</span>
             <span className="text-blue-600">Change Logs</span>
           </div>
         </div>
       </header>
 
-      {/* Content */}
       <main className="flex-1 flex flex-col overflow-hidden p-8">
         <div className="flex-1 flex flex-col bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
-          {/* Toolbar */}
           <div className="p-6 border-b border-gray-200 flex-shrink-0">
             <div className="flex items-center justify-between gap-4">
-              {/* Search */}
               <div className="flex-1 max-w-md relative">
                 <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
                 <input
@@ -101,7 +98,6 @@ const AdminChangeLogs = () => {
                 />
               </div>
 
-              {/* Action Buttons */}
               <div className="flex items-center gap-3">
                 <button
                   onClick={loadChangeLogs}
@@ -118,9 +114,11 @@ const AdminChangeLogs = () => {
                     className="appearance-none px-4 py-2 pr-10 border border-gray-300 rounded-lg hover:bg-gray-50 font-medium focus:outline-none focus:ring-2 focus:ring-blue-500"
                   >
                     <option value="all">All Actions</option>
-                    <option value="admin_added">Added</option>
-                    <option value="admin_updated">Updated</option>
-                    <option value="admin_deleted">Deleted</option>
+                    <option value="employee_added">Added</option>
+                    <option value="employee_updated">Updated</option>
+                    <option value="employee_archived">Archived</option>
+                    <option value="employee_restored">Restored</option>
+                    <option value="employee_deleted">Deleted</option>
                   </select>
                   <ChevronDown className="absolute right-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-500 pointer-events-none" />
                 </div>
@@ -128,7 +126,6 @@ const AdminChangeLogs = () => {
             </div>
           </div>
 
-          {/* Scrollable Table Container */}
           <div className="flex-1 overflow-auto">
             {loading ? (
               <div className="flex items-center justify-center h-full">
@@ -136,22 +133,22 @@ const AdminChangeLogs = () => {
               </div>
             ) : filteredLogs.length === 0 ? (
               <div className="flex items-center justify-center h-full">
-                <p className="text-gray-500">No admin change logs found</p>
+                <p className="text-gray-500">No change logs found</p>
               </div>
             ) : (
               <table className="w-full">
                 <thead className="bg-white sticky top-0 z-10">
                   <tr className="border-b border-gray-200">
-                    <th className="px-6 py-4 text-left text-xs font-bold text-gray-700 uppercase">ADMIN NAME</th>
+                    <th className="pl-8 pr-6 py-4 text-left text-xs font-bold text-gray-700 uppercase">NAME</th>
                     <th className="px-6 py-4 text-left text-xs font-bold text-gray-700 uppercase">ACTION TYPE</th>
                     <th className="px-6 py-4 text-left text-xs font-bold text-gray-700 uppercase">TIMESTAMP</th>
-                    <th className="px-6 py-4 text-left text-xs font-bold text-gray-700 uppercase">DESCRIPTION</th>
+                    <th className="pl-6 pr-8 py-4 text-left text-xs font-bold text-gray-700 uppercase">DESCRIPTION</th>
                   </tr>
                 </thead>
                 <tbody>
                   {paginatedLogs.map((log) => (
                     <tr key={log.id} className="border-b border-gray-100 hover:bg-gray-50">
-                      <td className="px-6 py-4">
+                      <td className="pl-8 pr-6 py-4">
                         <div>
                           <div className="text-sm text-gray-900 mb-0.5">{log.employeeName || 'Unknown'}</div>
                           <div className="text-sm text-gray-500">{log.details?.email || ''}</div>
@@ -162,13 +159,13 @@ const AdminChangeLogs = () => {
                           <span className={`inline-flex px-2 py-1 text-xs font-medium rounded-full ${getActionBadgeColor(log.type)}`}>
                             {getActionLabel(log.type)}
                           </span>
-                          <div className="text-sm text-gray-600 mt-1">{log.details?.position || ''}</div>
+                          <div className="text-sm text-gray-600 mt-1">By: {log.performedBy || 'System'}</div>
                         </div>
                       </td>
                       <td className="px-6 py-4">
                         <div className="text-sm text-gray-900">{formatLogTimestamp(log.timestamp)}</div>
                       </td>
-                      <td className="px-6 py-4">
+                      <td className="pl-6 pr-8 py-4">
                         <span className="text-sm text-gray-600">{log.description}</span>
                       </td>
                     </tr>
@@ -178,12 +175,11 @@ const AdminChangeLogs = () => {
             )}
           </div>
 
-          {/* Fixed Pagination at Bottom */}
           <div className="px-6 py-4 border-t border-gray-200 flex-shrink-0 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 bg-white">
             <div className="text-sm text-gray-600">
               {filteredLogs.length > 0 ? (
                 <>
-                  Showing {startIndex + 1} - {Math.min(endIndex, filteredLogs.length)} of {filteredLogs.length} admin change log{filteredLogs.length !== 1 ? 's' : ''}
+                  Showing {startIndex + 1} - {Math.min(endIndex, filteredLogs.length)} of {filteredLogs.length} change log{filteredLogs.length !== 1 ? 's' : ''}
                 </>
               ) : (
                 'No change logs'
@@ -232,4 +228,4 @@ const AdminChangeLogs = () => {
   );
 };
 
-export default AdminChangeLogs;
+export default AccountingChangeLogs;

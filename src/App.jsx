@@ -7,6 +7,9 @@ import { sendOTP, verifyOTP } from './OTPService';
 import { loginUser } from './services/authService';
 
 const BRMSystem = () => {
+  // Feature flag for OTP - set to false to disable OTP during development
+  const ENABLE_OTP = false; // Set to true during deployment
+  
   const [currentView, setCurrentView] = useState('login'); // 'login', 'verification', 'dashboard'
   const [dashboardType, setDashboardType] = useState('employee'); // 'employee', 'hr', 'accounting'
   const [loggedInUser, setLoggedInUser] = useState(null);
@@ -77,17 +80,25 @@ const BRMSystem = () => {
       const loginResult = await loginUser(formData.email, formData.password);
       
       if (loginResult.success) {
-        // Send OTP to user's email
-        const otpResult = await sendOTP(formData.email);
+        setLoggedInUser(loginResult.user);
+        setDashboardType(loginResult.dashboardType);
         
-        if (otpResult.success) {
-          setLoggedInUser(loginResult.user);
-          setDashboardType(loginResult.dashboardType);
-          setIsLoading(false);
-          setCurrentView('verification');
+        // Check if OTP is enabled
+        if (ENABLE_OTP) {
+          // Send OTP to user's email
+          const otpResult = await sendOTP(formData.email);
+          
+          if (otpResult.success) {
+            setIsLoading(false);
+            setCurrentView('verification');
+          } else {
+            setIsLoading(false);
+            setErrors({ email: otpResult.message || 'Failed to send OTP' });
+          }
         } else {
+          // Skip OTP verification - go directly to dashboard
           setIsLoading(false);
-          setErrors({ email: otpResult.message || 'Failed to send OTP' });
+          setCurrentView('dashboard');
         }
       } else {
         setIsLoading(false);
@@ -154,19 +165,19 @@ const BRMSystem = () => {
       ) : (
     <div className="min-h-screen flex">
       {/* Left Panel - Form */}
-      <div className="w-full lg:w-1/2 flex items-center justify-center p-8 bg-white">
-        <div className="w-full max-w-md px-4">
+      <div className="w-full lg:w-1/2 flex items-center justify-center p-4 sm:p-6 md:p-8 lg:p-12 bg-white">
+        <div className="w-full max-w-md px-2 sm:px-4">
           {/* Logo */}
-          <div className="mb-12">
+          <div className="mb-8 md:mb-12">
             <div className="flex items-center gap-2">
               <div className="relative">
-                <svg width="50" height="50" viewBox="0 0 50 50" fill="none">
+                <svg width="40" height="40" viewBox="0 0 50 50" fill="none" className="sm:w-[50px] sm:h-[50px]">
                   <path d="M10 35 L10 20 L20 10 L30 20 L30 35" stroke="#888" strokeWidth="2" fill="none"/>
                   <rect x="15" y="25" width="10" height="10" fill="#888"/>
                 </svg>
               </div>
               <div>
-                <h1 className="text-3xl font-bold">
+                <h1 className="text-2xl sm:text-3xl font-bold">
                   <span className="text-green-600">8</span>
                   <span className="text-blue-900">RM</span>
                 </h1>
@@ -178,9 +189,9 @@ const BRMSystem = () => {
           {/* Login Form */}
           {currentView === 'login' && (
             <div>
-              <h2 className="text-3xl font-semibold text-gray-900 mb-8">Sign Up</h2>
+              <h2 className="text-2xl sm:text-3xl font-semibold text-gray-900 mb-6 sm:mb-8">Welcome back!</h2>
               
-              <form onSubmit={handleLogin} className="space-y-6">
+              <form onSubmit={handleLogin} className="space-y-4 sm:space-y-6">
                 {/* Email Input */}
                 <div>
                   <label className="block text-sm font-medium text-gray-900 mb-2">
@@ -193,7 +204,7 @@ const BRMSystem = () => {
                       value={formData.email}
                       onChange={handleInputChange}
                       placeholder="ambrad.assistant@gmail.com"
-                      className={`w-full px-4 py-3 pr-12 border-2 rounded-lg focus:outline-none focus:border-blue-500 transition-colors ${
+                      className={`w-full px-4 py-2.5 sm:py-3 pr-12 border-2 rounded-lg focus:outline-none focus:border-blue-500 transition-colors ${
                         errors.email ? 'border-red-500' : formData.email ? 'border-blue-500' : 'border-gray-300'
                       }`}
                     />
@@ -218,7 +229,7 @@ const BRMSystem = () => {
                       value={formData.password}
                       onChange={handleInputChange}
                       placeholder="Enter password or Employee ID"
-                      className={`w-full px-4 py-3 pr-12 border-2 rounded-lg focus:outline-none focus:border-blue-500 transition-colors ${
+                      className={`w-full px-4 py-2.5 sm:py-3 pr-12 border-2 rounded-lg focus:outline-none focus:border-blue-500 transition-colors ${
                         errors.password ? 'border-red-500' : 'border-gray-300'
                       }`}
                     />
@@ -260,19 +271,14 @@ const BRMSystem = () => {
                 <button
                   type="submit"
                   disabled={isLoading}
-                  className="w-full bg-blue-600 text-white py-3.5 rounded-lg font-semibold hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed text-base"
+                  className="w-full bg-blue-600 text-white py-3 sm:py-3.5 rounded-lg font-semibold hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed text-base"
                 >
                   {isLoading ? 'Signing In...' : 'Sign In'}
                 </button>
 
                 {/* Sign Up Link */}
-                <div className="text-center mt-6">
-                  <p className="text-sm text-gray-600">
-                    Do not have account?{' '}
-                    <a href="#" className="text-blue-600 hover:text-blue-700 font-semibold">
-                      Sign Up
-                    </a>
-                  </p>
+                <div className="text-center mt-4 sm:mt-6">
+                  
                 </div>
               </form>
             </div>
@@ -281,12 +287,12 @@ const BRMSystem = () => {
           {/* Verification Form */}
           {currentView === 'verification' && (
             <div>
-              <h2 className="text-3xl font-semibold text-gray-900 mb-2">Verification</h2>
-              <p className="text-gray-600 mb-8 text-sm">
+              <h2 className="text-2xl sm:text-3xl font-semibold text-gray-900 mb-2">Verification</h2>
+              <p className="text-gray-600 mb-6 sm:mb-8 text-sm">
                 We've sent a verification code to your email
               </p>
               
-              <form onSubmit={handleVerification} className="space-y-6">
+              <form onSubmit={handleVerification} className="space-y-4 sm:space-y-6">
                 {/* Verification Code Input */}
                 <div>
                   <label className="block text-sm font-medium text-gray-900 mb-2">
@@ -299,7 +305,7 @@ const BRMSystem = () => {
                     onChange={handleInputChange}
                     placeholder="Enter 6-digit code"
                     maxLength={6}
-                    className={`w-full px-4 py-3 border-2 rounded-lg focus:outline-none focus:border-blue-500 text-center text-2xl tracking-widest transition-colors ${
+                    className={`w-full px-4 py-2.5 sm:py-3 border-2 rounded-lg focus:outline-none focus:border-blue-500 text-center text-xl sm:text-2xl tracking-widest transition-colors ${
                       errors.verificationCode ? 'border-red-500' : 'border-gray-300'
                     }`}
                   />
@@ -312,13 +318,13 @@ const BRMSystem = () => {
                 <button
                   type="submit"
                   disabled={isLoading}
-                  className="w-full bg-blue-600 text-white py-3.5 rounded-lg font-semibold hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed text-base"
+                  className="w-full bg-blue-600 text-white py-3 sm:py-3.5 rounded-lg font-semibold hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed text-base"
                 >
                   {isLoading ? 'Verifying...' : 'Verify'}
                 </button>
 
                 {/* Resend Link */}
-                <div className="text-center mt-6">
+                <div className="text-center mt-4 sm:mt-6">
                   <p className="text-sm text-gray-600">
                     Didn't receive the code?{' '}
                     <button
@@ -349,10 +355,10 @@ const BRMSystem = () => {
       </div>
 
       {/* Right Panel - Hero Section */}
-      <div className="hidden lg:flex lg:w-1/2 bg-blue-600 items-center justify-center p-16 relative overflow-hidden" style={{background: 'linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%)'}}>
+      <div className="hidden lg:flex lg:w-1/2 bg-blue-600 items-center justify-center p-8 xl:p-16 relative overflow-hidden" style={{background: 'linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%)'}}>
         {/* Decorative Polygons - Top Right */}
-        <div className="absolute top-8 right-8">
-          <svg width="180" height="180" viewBox="0 0 180 180" fill="none" className="opacity-30">
+        <div className="absolute top-4 xl:top-8 right-4 xl:right-8">
+          <svg width="140" height="140" viewBox="0 0 180 180" fill="none" className="opacity-30 xl:w-[180px] xl:h-[180px]">
             <path d="M20 0 L80 20 L70 80 L30 70 Z" fill="white" fillOpacity="0.3"/>
             <path d="M90 10 L150 30 L140 90 L80 70 Z" fill="white" fillOpacity="0.2"/>
           </svg>
@@ -360,36 +366,36 @@ const BRMSystem = () => {
 
         {/* Decorative Polygons - Top Left */}
         <div className="absolute top-0 left-0">
-          <svg width="120" height="120" viewBox="0 0 120 120" fill="none" className="opacity-30">
+          <svg width="100" height="100" viewBox="0 0 120 120" fill="none" className="opacity-30 xl:w-[120px] xl:h-[120px]">
             <path d="M0 40 L60 20 L80 80 L20 100 Z" fill="white" fillOpacity="0.2"/>
           </svg>
         </div>
 
         {/* Decorative Polygons - Bottom Right */}
         <div className="absolute bottom-0 right-0">
-          <svg width="160" height="160" viewBox="0 0 160 160" fill="none" className="opacity-30">
+          <svg width="130" height="130" viewBox="0 0 160 160" fill="none" className="opacity-30 xl:w-[160px] xl:h-[160px]">
             <path d="M100 100 L160 120 L140 160 L80 140 Z" fill="white" fillOpacity="0.25"/>
           </svg>
         </div>
 
         {/* Decorative Polygons - Bottom Left */}
-        <div className="absolute bottom-16 left-8">
-          <svg width="220" height="220" viewBox="0 0 220 220" fill="none" className="opacity-40">
+        <div className="absolute bottom-8 xl:bottom-16 left-4 xl:left-8">
+          <svg width="180" height="180" viewBox="0 0 220 220" fill="none" className="opacity-40 xl:w-[220px] xl:h-[220px]">
             <path d="M20 120 L100 140 L80 200 L0 180 Z" fill="white" fillOpacity="0.15"/>
             <path d="M100 140 L180 160 L160 220 L80 200 Z" fill="white" fillOpacity="0.25"/>
           </svg>
         </div>
         
-        <div className="relative z-10 text-center max-w-2xl px-8">
+        <div className="relative z-10 text-center max-w-2xl px-4 xl:px-8">
           {/* Building Image with Frame */}
-          <div className="mb-12 flex justify-center">
+          <div className="mb-8 xl:mb-12 flex justify-center">
             <div className="relative w-full max-w-xl">
-              <div className="bg-gradient-to-br from-blue-300/40 to-blue-400/30 backdrop-blur-sm rounded-3xl shadow-2xl p-1">
-                <div className="bg-gradient-to-br from-gray-100 to-gray-200 rounded-3xl p-6">
+              <div className="bg-gradient-to-br from-blue-300/40 to-blue-400/30 backdrop-blur-sm rounded-2xl xl:rounded-3xl shadow-2xl p-1">
+                <div className="bg-gradient-to-br from-gray-100 to-gray-200 rounded-2xl xl:rounded-3xl p-4 xl:p-6">
                   <img
                     src="https://images.unsplash.com/photo-1486406146926-c627a92ad1ab?w=900&h=600&fit=crop&q=80"
                     alt="Modern Building Construction - 8RM Project"
-                    className="w-full h-80 object-cover rounded-2xl shadow-lg"
+                    className="w-full h-60 xl:h-80 object-cover rounded-xl xl:rounded-2xl shadow-lg"
                   />
                 </div>
               </div>
@@ -397,12 +403,12 @@ const BRMSystem = () => {
           </div>
 
           {/* Text Content */}
-          <h2 className="text-5xl font-bold text-white mb-6 leading-tight">
+          <h2 className="text-3xl xl:text-5xl font-bold text-white mb-4 xl:mb-6 leading-tight">
             Powerful Dashboard for<br />
             Managing 8RM Utility Project<br />
             Construction
           </h2>
-          <p className="text-blue-50 text-lg leading-relaxed max-w-2xl mx-auto mb-10" style={{lineHeight: '1.8'}}>
+          <p className="text-blue-50 text-base xl:text-lg leading-relaxed max-w-2xl mx-auto mb-6 xl:mb-10" style={{lineHeight: '1.8'}}>
             Simplify your construction operations with 8RM's centralized management system.
             Track projects, monitor utilities, manage resources, and oversee progress in real time
             for faster, smarter, and more efficient decision-making.
@@ -410,9 +416,9 @@ const BRMSystem = () => {
 
           {/* Pagination Dots */}
           <div className="flex justify-center gap-2.5">
-            <div className="w-10 h-2.5 bg-white rounded-full shadow-sm"></div>
-            <div className="w-2.5 h-2.5 bg-white/50 rounded-full"></div>
-            <div className="w-2.5 h-2.5 bg-white/50 rounded-full"></div>
+            <div className="w-8 xl:w-10 h-2 xl:h-2.5 bg-white rounded-full shadow-sm"></div>
+            <div className="w-2 xl:w-2.5 h-2 xl:h-2.5 bg-white/50 rounded-full"></div>
+            <div className="w-2 xl:w-2.5 h-2 xl:h-2.5 bg-white/50 rounded-full"></div>
           </div>
         </div>
       </div>
