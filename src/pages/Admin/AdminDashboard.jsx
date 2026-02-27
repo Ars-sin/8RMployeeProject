@@ -3,6 +3,7 @@ import { Menu, Users, Archive, ClipboardList, Shield, LogOut, Plus, Trash2, Sear
 import AdminArchived from './AdminArchived';
 import AdminChangeLogs from './AdminChangeLogs';
 import AddAdminModal from './AddAdminModal';
+import ConfirmationModal from '../../Components/ConfirmationModal';
 import { getAdmins, addAdmin, updateAdmin, archiveAdmin } from '../../services/adminService';
 import editIcon from '../../Components/ui/edit.png';
 
@@ -17,6 +18,15 @@ const AdminDashboard = ({ onLogout }) => {
   const [searchTerm, setSearchTerm] = useState('');
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 10;
+
+  // Confirmation modal states
+  const [confirmModal, setConfirmModal] = useState({
+    isOpen: false,
+    title: '',
+    message: '',
+    onConfirm: null,
+    type: 'danger'
+  });
 
   // Load admins
   useEffect(() => {
@@ -61,16 +71,32 @@ const AdminDashboard = ({ onLogout }) => {
   };
 
   const handleDeleteAdmin = async (adminId) => {
-    if (window.confirm('Are you sure you want to archive this admin?')) {
-      try {
-        await archiveAdmin(adminId);
-        await loadAdmins();
-        alert('Admin archived successfully!');
-      } catch (error) {
-        console.error('Error archiving admin:', error);
-        alert('Failed to archive admin');
-      }
-    }
+    setConfirmModal({
+      isOpen: true,
+      title: 'Archive Admin',
+      message: 'Are you sure you want to archive this admin? They can be restored later from the Archived section.',
+      onConfirm: async () => {
+        try {
+          await archiveAdmin(adminId);
+          await loadAdmins();
+          alert('Admin archived successfully!');
+        } catch (error) {
+          console.error('Error archiving admin:', error);
+          alert('Failed to archive admin');
+        }
+      },
+      type: 'warning'
+    });
+  };
+
+  const handleLogoutClick = () => {
+    setConfirmModal({
+      isOpen: true,
+      title: 'Logout',
+      message: 'Are you sure you want to logout?',
+      onConfirm: onLogout,
+      type: 'info'
+    });
   };
 
   const handleEditClick = (admin) => {
@@ -163,7 +189,7 @@ const AdminDashboard = ({ onLogout }) => {
         {/* Logout Button */}
         <div className="p-6">
           <button 
-            onClick={onLogout}
+            onClick={handleLogoutClick}
             className="w-full flex items-center justify-center gap-2 px-4 py-3 bg-blue-600 text-white rounded-lg font-semibold hover:bg-blue-700 transition-colors shadow-sm"
           >
             <LogOut className="w-5 h-5" />
@@ -182,13 +208,54 @@ const AdminDashboard = ({ onLogout }) => {
           // Admin List View
           <div className="flex-1 flex flex-col overflow-hidden bg-gray-50">
             {/* Header */}
-            <header className="bg-white border-b border-gray-200 px-8 py-5 flex-shrink-0">
-              <div>
-                <h1 className="text-2xl font-semibold text-gray-900">Admins</h1>
-                <div className="flex items-center gap-2 text-sm text-gray-500 mt-0.5">
-                  <span>General</span>
-                  <span>›</span>
-                  <span className="text-blue-600">Admins</span>
+            <header className="bg-white border-b border-gray-200 flex-shrink-0">
+              <div className="px-8 py-5">
+                <h1 className="text-2xl font-semibold text-gray-900 mb-1">Admins</h1>
+                <div className="mb-4">
+                  <span className="text-sm text-blue-600">Admins</span>
+                </div>
+                
+                {/* Search and Actions */}
+                <div className="flex items-center justify-between gap-4">
+                  {/* Search */}
+                  <div className="flex-1 max-w-md relative">
+                    <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
+                    <input
+                      type="text"
+                      placeholder="Search for id, name Customer"
+                      value={searchTerm}
+                      onChange={(e) => setSearchTerm(e.target.value)}
+                      className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    />
+                  </div>
+
+                  {/* Action Buttons */}
+                  <div className="flex items-center gap-3">
+                    <button 
+                      className="flex items-center gap-2 px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 font-medium"
+                    >
+                      <Filter className="w-4 h-4" />
+                      Filter
+                    </button>
+                    
+                    <button 
+                      className="flex items-center gap-2 px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 font-medium"
+                    >
+                      <Download className="w-4 h-4" />
+                      Export
+                    </button>
+
+                    <button
+                      onClick={() => {
+                        setEditingAdmin(null);
+                        setShowAddAdminModal(true);
+                      }}
+                      className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-medium"
+                    >
+                      <Plus className="w-5 h-5" />
+                      Add Admin
+                    </button>
+                  </div>
                 </div>
               </div>
             </header>
@@ -196,50 +263,6 @@ const AdminDashboard = ({ onLogout }) => {
             {/* Content */}
             <main className="flex-1 flex flex-col overflow-hidden p-8">
               <div className="flex-1 flex flex-col bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
-                {/* Toolbar */}
-                <div className="p-6 border-b border-gray-200 flex-shrink-0">
-                  <div className="flex items-center justify-between gap-4">
-                    {/* Search */}
-                    <div className="flex-1 max-w-md relative">
-                      <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
-                      <input
-                        type="text"
-                        placeholder="Search for id, name Customer"
-                        value={searchTerm}
-                        onChange={(e) => setSearchTerm(e.target.value)}
-                        className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                      />
-                    </div>
-
-                    {/* Action Buttons */}
-                    <div className="flex items-center gap-3">
-                      <button 
-                        className="flex items-center gap-2 px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 font-medium"
-                      >
-                        <Filter className="w-4 h-4" />
-                        Filter
-                      </button>
-                      
-                      <button 
-                        className="flex items-center gap-2 px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 font-medium"
-                      >
-                        <Download className="w-4 h-4" />
-                        Export
-                      </button>
-
-                      <button
-                        onClick={() => {
-                          setEditingAdmin(null);
-                          setShowAddAdminModal(true);
-                        }}
-                        className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-medium"
-                      >
-                        <Plus className="w-5 h-5" />
-                        Add Admin
-                      </button>
-                    </div>
-                  </div>
-                </div>
 
                 {/* Scrollable Table Container */}
                 <div className="flex-1 overflow-auto">
@@ -377,6 +400,16 @@ const AdminDashboard = ({ onLogout }) => {
           onSave={editingAdmin ? handleEditAdmin : handleAddAdmin}
         />
       )}
+
+      {/* Confirmation Modal */}
+      <ConfirmationModal
+        isOpen={confirmModal.isOpen}
+        onClose={() => setConfirmModal({ ...confirmModal, isOpen: false })}
+        onConfirm={confirmModal.onConfirm}
+        title={confirmModal.title}
+        message={confirmModal.message}
+        type={confirmModal.type}
+      />
     </div>
   );
 };

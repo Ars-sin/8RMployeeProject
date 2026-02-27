@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Search, Filter, Download, RotateCcw, Trash2 } from 'lucide-react';
+import ConfirmationModal from '../../Components/ConfirmationModal';
 import { getEmployees, restoreEmployee, deleteEmployee } from '../../services/employeeService';
 
 const ArchivedPage = ({ onNavigate, projects }) => {
@@ -10,6 +11,15 @@ const ArchivedPage = ({ onNavigate, projects }) => {
   const [showRestoreModal, setShowRestoreModal] = useState(false);
   const [restoringEmployee, setRestoringEmployee] = useState(null);
   const [selectedProjectId, setSelectedProjectId] = useState('');
+
+  // Confirmation modal states
+  const [confirmModal, setConfirmModal] = useState({
+    isOpen: false,
+    title: '',
+    message: '',
+    onConfirm: null,
+    type: 'danger'
+  });
 
   // Load archived employees from Firebase
   useEffect(() => {
@@ -48,10 +58,16 @@ const ArchivedPage = ({ onNavigate, projects }) => {
       const { updateEmployee } = await import('../../services/employeeService');
       await updateEmployee(restoringEmployee.id, { projectId: selectedProjectId });
       
-      setArchivedEmployees(archivedEmployees.filter(emp => emp.id !== restoringEmployee.id));
+      // Remove the restored employee from the archived list immediately
+      setArchivedEmployees(prevEmployees => 
+        prevEmployees.filter(emp => emp.id !== restoringEmployee.id)
+      );
+      
+      // Close modal and reset state
       setShowRestoreModal(false);
       setRestoringEmployee(null);
       setSelectedProjectId('');
+      
       alert('Employee restored successfully!');
     } catch (error) {
       console.error('Error restoring employee:', error);
@@ -59,17 +75,26 @@ const ArchivedPage = ({ onNavigate, projects }) => {
     }
   };
 
-  const handlePermanentDelete = async (id) => {
-    if (window.confirm('⚠️ WARNING: This will permanently delete the employee from the database. This action cannot be undone. Are you sure?')) {
-      try {
-        await deleteEmployee(id);
-        setArchivedEmployees(archivedEmployees.filter(emp => emp.id !== id));
-        alert('Employee permanently deleted');
-      } catch (error) {
-        console.error('Error deleting employee:', error);
-        alert('Failed to delete employee. Please try again.');
-      }
-    }
+  const handlePermanentDelete = async (employee) => {
+    setConfirmModal({
+      isOpen: true,
+      title: 'Permanently Delete Employee',
+      message: `⚠️ WARNING: This will permanently delete ${employee.fullName || employee.name} from the database. This action cannot be undone. Are you sure?`,
+      onConfirm: async () => {
+        try {
+          await deleteEmployee(employee.id);
+          // Remove the deleted employee from the list immediately
+          setArchivedEmployees(prevEmployees => 
+            prevEmployees.filter(emp => emp.id !== employee.id)
+          );
+          alert('Employee permanently deleted');
+        } catch (error) {
+          console.error('Error deleting employee:', error);
+          alert('Failed to delete employee. Please try again.');
+        }
+      },
+      type: 'danger'
+    });
   };
 
   const handleExport = () => {
@@ -91,16 +116,44 @@ const ArchivedPage = ({ onNavigate, projects }) => {
   return (
     <div className="flex-1 flex flex-col overflow-hidden bg-gray-50">
       {/* Header */}
-      <header className="bg-white border-b border-gray-200 px-8 py-5">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-4">
-            <div>
-              <h1 className="text-2xl font-semibold text-gray-900">Archived Employees</h1>
-              <div className="flex items-center gap-2 text-sm text-gray-500 mt-0.5">
-                <span>HR Management</span>
-                <span>›</span>
-                <span className="text-blue-600">Archived</span>
-              </div>
+      <header className="bg-white border-b border-gray-200 flex-shrink-0">
+        <div className="px-8 py-5">
+          <h1 className="text-2xl font-semibold text-gray-900 mb-1">Archived Employees</h1>
+          <div className="mb-4">
+            <span className="text-sm text-blue-600">Archived</span>
+          </div>
+          
+          {/* Search and Actions */}
+          <div className="flex items-center justify-between gap-4">
+            {/* Search */}
+            <div className="flex-1 max-w-md relative">
+              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
+              <input
+                type="text"
+                placeholder="Search for id, open Consumer"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              />
+            </div>
+
+            {/* Action Buttons */}
+            <div className="flex items-center gap-3">
+              <button 
+                onClick={handleExport}
+                className="flex items-center gap-2 px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 font-medium"
+              >
+                <Filter className="w-4 h-4" />
+                Filter
+              </button>
+              
+              <button 
+                onClick={handleExport}
+                className="flex items-center gap-2 px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 font-medium"
+              >
+                <Download className="w-4 h-4" />
+                Export
+              </button>
             </div>
           </div>
         </div>
@@ -109,41 +162,6 @@ const ArchivedPage = ({ onNavigate, projects }) => {
       {/* Content */}
       <main className="flex-1 flex flex-col overflow-hidden p-8">
         <div className="flex-1 flex flex-col bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
-          {/* Toolbar */}
-          <div className="p-6 border-b border-gray-200 flex-shrink-0">
-            <div className="flex items-center justify-between gap-4">
-              {/* Search */}
-              <div className="flex-1 max-w-md relative">
-                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
-                <input
-                  type="text"
-                  placeholder="Search for id, open Consumer"
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                />
-              </div>
-
-              {/* Action Buttons */}
-              <div className="flex items-center gap-3">
-                <button 
-                  onClick={handleExport}
-                  className="flex items-center gap-2 px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 font-medium"
-                >
-                  <Filter className="w-4 h-4" />
-                  Filter
-                </button>
-                
-                <button 
-                  onClick={handleExport}
-                  className="flex items-center gap-2 px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 font-medium"
-                >
-                  <Download className="w-4 h-4" />
-                  Export
-                </button>
-              </div>
-            </div>
-          </div>
 
           {/* Scrollable Table Container */}
           <div className="flex-1 overflow-auto">
@@ -302,6 +320,16 @@ const ArchivedPage = ({ onNavigate, projects }) => {
           </div>
         </div>
       )}
+
+      {/* Confirmation Modal */}
+      <ConfirmationModal
+        isOpen={confirmModal.isOpen}
+        onClose={() => setConfirmModal({ ...confirmModal, isOpen: false })}
+        onConfirm={confirmModal.onConfirm}
+        title={confirmModal.title}
+        message={confirmModal.message}
+        type={confirmModal.type}
+      />
     </div>
   );
 };

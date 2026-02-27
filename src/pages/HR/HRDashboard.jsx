@@ -3,6 +3,9 @@ import { Users, Archive, ClipboardList, LogOut, Plus, Trash2, Search, Briefcase 
 import ArchivedPage from './ArchivedPage';
 import ChangeLogsPage from './ChangeLogsPage';
 import AddEmployeeForm from './AddEmployeeForm';
+import ViewEmployeeDetails from './ViewEmployeeDetails';
+import ConfirmationModal from '../../Components/ConfirmationModal';
+import LoadingSpinner from '../../Components/LoadingSpinner';
 import { getEmployees, addEmployee, updateEmployee, archiveEmployee } from '../../services/employeeService';
 import { getProjects, addProject, updateProject, deleteProject } from '../../services/projectService';
 import AddProjectModal from './AddProjectModal.jsx';
@@ -15,14 +18,26 @@ const HRDashboard = ({ user, onLogout }) => {
   const [employees, setEmployees] = useState([]);
   const [projects, setProjects] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [projectsLoading, setProjectsLoading] = useState(true);
   const [showAddEmployeeForm, setShowAddEmployeeForm] = useState(false);
   const [showAddProjectModal, setShowAddProjectModal] = useState(false);
+  const [showViewEmployeeDetails, setShowViewEmployeeDetails] = useState(false);
+  const [viewingEmployee, setViewingEmployee] = useState(null);
   const [editingEmployee, setEditingEmployee] = useState(null);
   const [editingProject, setEditingProject] = useState(null);
   const [searchTerm, setSearchTerm] = useState('');
   const [currentProjectPage, setCurrentProjectPage] = useState(1);
   const [currentEmployeePage, setCurrentEmployeePage] = useState(1);
   const itemsPerPage = 10;
+
+  // Confirmation modal states
+  const [confirmModal, setConfirmModal] = useState({
+    isOpen: false,
+    title: '',
+    message: '',
+    onConfirm: null,
+    type: 'danger'
+  });
 
   useEffect(() => {
     loadEmployees();
@@ -43,10 +58,13 @@ const HRDashboard = ({ user, onLogout }) => {
 
   const loadProjects = async () => {
     try {
+      setProjectsLoading(true);
       const data = await getProjects();
       setProjects(data);
     } catch (error) {
       console.error('Error loading projects:', error);
+    } finally {
+      setProjectsLoading(false);
     }
   };
 
@@ -86,20 +104,31 @@ const HRDashboard = ({ user, onLogout }) => {
   };
 
   const handleDeleteEmployee = async (employeeId) => {
-    if (window.confirm('Are you sure you want to archive this employee?')) {
-      try {
-        await archiveEmployee(employeeId);
-        await loadEmployees();
-      } catch (error) {
-        console.error('Error archiving employee:', error);
-        alert('Failed to archive employee');
-      }
-    }
+    setConfirmModal({
+      isOpen: true,
+      title: 'Archive Employee',
+      message: 'Are you sure you want to archive this employee? They can be restored later from the Archived section.',
+      onConfirm: async () => {
+        try {
+          await archiveEmployee(employeeId);
+          await loadEmployees();
+        } catch (error) {
+          console.error('Error archiving employee:', error);
+          alert('Failed to archive employee');
+        }
+      },
+      type: 'warning'
+    });
   };
 
   const handleEditEmployeeClick = (employee) => {
     setEditingEmployee(employee);
     setShowAddEmployeeForm(true);
+  };
+
+  const handleViewEmployeeClick = (employee) => {
+    setViewingEmployee(employee);
+    setShowViewEmployeeDetails(true);
   };
 
   const handleAddProject = async (formData) => {
@@ -128,16 +157,32 @@ const HRDashboard = ({ user, onLogout }) => {
   };
 
   const handleDeleteProject = async (projectId) => {
-    if (window.confirm('Are you sure you want to delete this project?')) {
-      try {
-        await deleteProject(projectId);
-        await loadProjects();
-        alert('Project deleted successfully!');
-      } catch (error) {
-        console.error('Error deleting project:', error);
-        alert('Failed to delete project');
-      }
-    }
+    setConfirmModal({
+      isOpen: true,
+      title: 'Delete Project',
+      message: 'Are you sure you want to delete this project? This action cannot be undone.',
+      onConfirm: async () => {
+        try {
+          await deleteProject(projectId);
+          await loadProjects();
+          alert('Project deleted successfully!');
+        } catch (error) {
+          console.error('Error deleting project:', error);
+          alert('Failed to delete project');
+        }
+      },
+      type: 'danger'
+    });
+  };
+
+  const handleLogoutClick = () => {
+    setConfirmModal({
+      isOpen: true,
+      title: 'Logout',
+      message: 'Are you sure you want to logout?',
+      onConfirm: onLogout,
+      type: 'info'
+    });
   };
 
   const handleEditProjectClick = (project) => {
@@ -233,20 +278,9 @@ const HRDashboard = ({ user, onLogout }) => {
           </div>
 
           {/* User Info */}
-          <div className="mb-6 p-3 bg-blue-50 rounded-lg">
-            <p className="text-xs text-gray-500">Logged in as</p>
-            <p className="text-sm font-semibold text-gray-900">{user?.fullName || 'HR User'}</p>
-            <p className="text-xs text-gray-600">{user?.position || 'HR Department'}</p>
-          </div>
+          
 
-          {/* Current Project Context */}
-          {selectedProject && (
-            <div className="mb-4 p-3 bg-green-50 border border-green-200 rounded-lg">
-              <p className="text-xs text-green-600 font-semibold mb-1">Current Project</p>
-              <p className="text-sm font-semibold text-gray-900">{selectedProject.projectName}</p>
-              <p className="text-xs text-gray-600">{selectedProject.location}</p>
-            </div>
-          )}
+          
 
           {/* Navigation */}
           <div>
@@ -255,7 +289,7 @@ const HRDashboard = ({ user, onLogout }) => {
               <button 
                 onClick={handleBackToProjects}
                 className={`w-full flex items-center gap-3 px-4 py-2.5 rounded-lg font-medium ${
-                  currentView === 'projects' 
+                  currentView === 'projects' || currentView === 'employees'
                     ? 'bg-blue-50 text-blue-600' 
                     : 'text-gray-600 hover:bg-gray-50'
                 }`}
@@ -263,20 +297,6 @@ const HRDashboard = ({ user, onLogout }) => {
                 <Briefcase className="w-5 h-5" />
                 Projects
               </button>
-
-              {selectedProject && (
-                <button 
-                  onClick={() => setCurrentView('employees')}
-                  className={`w-full flex items-center gap-3 px-4 py-2.5 rounded-lg font-medium ${
-                    currentView === 'employees' 
-                      ? 'bg-blue-50 text-blue-600' 
-                      : 'text-gray-600 hover:bg-gray-50'
-                  }`}
-                >
-                  <Users className="w-5 h-5" />
-                  Employees
-                </button>
-              )}
               
               <button 
                 onClick={() => setCurrentView('archived')}
@@ -308,7 +328,7 @@ const HRDashboard = ({ user, onLogout }) => {
         {/* Logout Button */}
         <div className="p-6">
           <button 
-            onClick={onLogout}
+            onClick={handleLogoutClick}
             className="w-full flex items-center justify-center gap-2 px-4 py-3 bg-blue-600 text-white rounded-lg font-semibold hover:bg-blue-700 transition-colors shadow-sm"
           >
             <LogOut className="w-5 h-5" />
@@ -327,36 +347,43 @@ const HRDashboard = ({ user, onLogout }) => {
           // Projects List View
           <div className="flex-1 flex flex-col overflow-hidden bg-gray-50">
             {/* Header */}
-            <header className="bg-white border-b border-gray-200 px-8 py-5 flex-shrink-0">
-              <div>
-                <h2 className="text-2xl font-semibold text-gray-900">Projects</h2>
-                <div className="flex items-center gap-2 text-sm text-gray-500 mt-0.5">
-                  <span>HR Management</span>
-                  <span>›</span>
-                  <span className="text-blue-600">Projects</span>
+            <header className="bg-white border-b border-gray-200 flex-shrink-0">
+              <div className="px-8 py-5">
+                <h2 className="text-2xl font-semibold text-gray-900 mb-1">Projects</h2>
+                <div className="mb-4">
+                  <span className="text-sm text-blue-600">Projects</span>
                 </div>
-              </div>
-            </header>
+                
+                {/* Search and Actions */}
+                <div className="flex items-center justify-between gap-4">
+                  {/* Search */}
+                  <div className="flex-1 max-w-md relative">
+                    <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400" />
+                    <input
+                      type="text"
+                      placeholder="Search for id, name Projects"
+                      value={searchTerm}
+                      onChange={(e) => setSearchTerm(e.target.value)}
+                      className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    />
+                  </div>
 
-            {/* Content */}
-            <main className="flex-1 flex flex-col overflow-hidden p-8">
-              <div className="flex-1 flex flex-col bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
-                {/* Toolbar */}
-                <div className="p-6 border-b border-gray-200 flex-shrink-0">
-                  <div className="flex items-center justify-between gap-4">
-                    {/* Search */}
-                    <div className="flex-1 max-w-md relative">
-                      <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400" />
-                      <input
-                        type="text"
-                        placeholder="Search projects..."
-                        value={searchTerm}
-                        onChange={(e) => setSearchTerm(e.target.value)}
-                        className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                      />
-                    </div>
+                  {/* Action Buttons */}
+                  <div className="flex items-center gap-3">
+                    <button className="flex items-center gap-2 px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 font-medium">
+                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z" />
+                      </svg>
+                      Filter
+                    </button>
+                    
+                    <button className="flex items-center gap-2 px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 font-medium">
+                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+                      </svg>
+                      Export
+                    </button>
 
-                    {/* Action Button */}
                     <button
                       onClick={() => {
                         setEditingProject(null);
@@ -369,13 +396,16 @@ const HRDashboard = ({ user, onLogout }) => {
                     </button>
                   </div>
                 </div>
+              </div>
+            </header>
 
+            {/* Content */}
+            <main className="flex-1 flex flex-col overflow-hidden p-8">
+              <div className="flex-1 flex flex-col bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
                 {/* Scrollable Table Container */}
                 <div className="flex-1 overflow-auto">
-                  {loading ? (
-                    <div className="flex items-center justify-center h-full">
-                      <p className="text-gray-500">Loading projects...</p>
-                    </div>
+                  {projectsLoading ? (
+                    <LoadingSpinner message="Loading Projects" />
                   ) : filteredProjects.length === 0 ? (
                     <div className="flex items-center justify-center h-full">
                       <p className="text-gray-500">No projects found</p>
@@ -388,7 +418,7 @@ const HRDashboard = ({ user, onLogout }) => {
                             PROJECT NAME
                           </th>
                           <th className="px-6 py-4 text-left text-xs font-bold text-gray-700 uppercase tracking-wider">
-                            LOCATION
+                            BUDGET
                           </th>
                           <th className="px-6 py-4 text-left text-xs font-bold text-gray-700 uppercase tracking-wider">
                             START DATE
@@ -413,10 +443,10 @@ const HRDashboard = ({ user, onLogout }) => {
                               </button>
                             </td>
                             <td className="px-6 py-4">
-                              <div className="text-sm text-gray-500">{project.location}</div>
+                              <div className="text-sm text-gray-900">{project.budget || 'N/A'}</div>
                             </td>
                             <td className="px-6 py-4">
-                              <div className="text-sm text-gray-500">{project.startDate}</div>
+                              <div className="text-sm text-gray-900">{project.startDate}</div>
                             </td>
                             <td className="px-6 py-4">
                               <span className={`px-2 py-1 text-xs font-semibold rounded-full ${getStatusColor(project.status)}`}>
@@ -503,53 +533,50 @@ const HRDashboard = ({ user, onLogout }) => {
           // Employees List View (for selected project)
           <div className="flex-1 flex flex-col overflow-hidden bg-gray-50">
             {/* Header */}
-            <header className="bg-white border-b border-gray-200 px-8 py-5 flex-shrink-0">
-              <div>
-                <div className="flex items-center gap-3">
+            <header className="bg-white border-b border-gray-200 flex-shrink-0">
+              <div className="px-8 py-5">
+                <h2 className="text-2xl font-semibold text-gray-900 mb-1">
+                  {selectedProject?.projectName || 'Project'} - Employees
+                </h2>
+                <div className="mb-4">
                   <button
                     onClick={handleBackToProjects}
-                    className="p-1.5 hover:bg-gray-100 rounded-lg transition-colors"
-                    title="Back to Projects"
+                    className="text-sm text-blue-600 hover:text-blue-800 hover:underline"
                   >
-                    <svg className="w-5 h-5 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
-                    </svg>
+                    Projects › {selectedProject?.projectName || 'Project'}
                   </button>
-                  <div>
-                    <h2 className="text-2xl font-semibold text-gray-900">
-                      {selectedProject?.projectName || 'Project'} - Employees
-                    </h2>
-                    <div className="flex items-center gap-2 text-sm text-gray-500 mt-0.5">
-                      <span>HR Management</span>
-                      <span>›</span>
-                      <span>Projects</span>
-                      <span>›</span>
-                      <span className="text-blue-600">{selectedProject?.projectName || 'Project'}</span>
-                    </div>
-                  </div>
                 </div>
-              </div>
-            </header>
+                
+                {/* Search and Actions */}
+                <div className="flex items-center justify-between gap-4">
+                  {/* Search */}
+                  <div className="flex-1 max-w-md relative">
+                    <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400" />
+                    <input
+                      type="text"
+                      placeholder="Search for id, name Employees"
+                      value={searchTerm}
+                      onChange={(e) => setSearchTerm(e.target.value)}
+                      className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    />
+                  </div>
 
-            {/* Content */}
-            <main className="flex-1 flex flex-col overflow-hidden p-8">
-              <div className="flex-1 flex flex-col bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
-                {/* Toolbar */}
-                <div className="p-6 border-b border-gray-200 flex-shrink-0">
-                  <div className="flex items-center justify-between gap-4">
-                    {/* Search */}
-                    <div className="flex-1 max-w-md relative">
-                      <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400" />
-                      <input
-                        type="text"
-                        placeholder="Search employees..."
-                        value={searchTerm}
-                        onChange={(e) => setSearchTerm(e.target.value)}
-                        className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                      />
-                    </div>
+                  {/* Action Buttons */}
+                  <div className="flex items-center gap-3">
+                    <button className="flex items-center gap-2 px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 font-medium">
+                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z" />
+                      </svg>
+                      Filter
+                    </button>
+                    
+                    <button className="flex items-center gap-2 px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 font-medium">
+                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+                      </svg>
+                      Export
+                    </button>
 
-                    {/* Action Button */}
                     <button
                       onClick={() => {
                         setEditingEmployee(null);
@@ -562,13 +589,16 @@ const HRDashboard = ({ user, onLogout }) => {
                     </button>
                   </div>
                 </div>
+              </div>
+            </header>
 
+            {/* Content */}
+            <main className="flex-1 flex flex-col overflow-hidden p-8">
+              <div className="flex-1 flex flex-col bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
                 {/* Scrollable Table Container */}
                 <div className="flex-1 overflow-auto">
                   {loading ? (
-                    <div className="flex items-center justify-center h-full">
-                      <p className="text-gray-500">Loading employees...</p>
-                    </div>
+                    <LoadingSpinner message="Loading Employees" />
                   ) : filteredEmployees.length === 0 ? (
                     <div className="flex items-center justify-center h-full">
                       <p className="text-gray-500">No employees found</p>
@@ -604,7 +634,12 @@ const HRDashboard = ({ user, onLogout }) => {
                               <div className="text-sm text-gray-900">{employee.employmentId}</div>
                             </td>
                             <td className="px-6 py-4">
-                              <div className="text-sm font-medium text-gray-900">{employee.fullName}</div>
+                              <button
+                                onClick={() => handleViewEmployeeClick(employee)}
+                                className="text-sm font-medium text-blue-600 hover:text-blue-800 hover:underline transition-colors"
+                              >
+                                {employee.fullName}
+                              </button>
                             </td>
                             <td className="px-6 py-4">
                               <div className="text-sm text-gray-500">{employee.email}</div>
@@ -723,6 +758,27 @@ const HRDashboard = ({ user, onLogout }) => {
           onSave={editingProject ? handleEditProject : handleAddProject}
         />
       )}
+
+      {/* View Employee Details Modal */}
+      {showViewEmployeeDetails && viewingEmployee && (
+        <ViewEmployeeDetails
+          employee={viewingEmployee}
+          onClose={() => {
+            setShowViewEmployeeDetails(false);
+            setViewingEmployee(null);
+          }}
+        />
+      )}
+
+      {/* Confirmation Modal */}
+      <ConfirmationModal
+        isOpen={confirmModal.isOpen}
+        onClose={() => setConfirmModal({ ...confirmModal, isOpen: false })}
+        onConfirm={confirmModal.onConfirm}
+        title={confirmModal.title}
+        message={confirmModal.message}
+        type={confirmModal.type}
+      />
     </div>
   );
 };
