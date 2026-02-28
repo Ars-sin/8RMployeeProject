@@ -3,6 +3,7 @@ import { Menu, Users, Archive, ClipboardList, Shield, LogOut, Plus, Trash2, Sear
 import AdminArchived from './AdminArchived';
 import AdminChangeLogs from './AdminChangeLogs';
 import AddAdminModal from './AddAdminModal';
+import ViewAdminDetails from './ViewAdminDetails';
 import ConfirmationModal from '../../Components/ConfirmationModal';
 import { getAdmins, addAdmin, updateAdmin, archiveAdmin } from '../../services/adminService';
 import editIcon from '../../Components/ui/edit.png';
@@ -14,6 +15,8 @@ const AdminDashboard = ({ onLogout }) => {
   const [admins, setAdmins] = useState([]);
   const [loading, setLoading] = useState(true);
   const [showAddAdminModal, setShowAddAdminModal] = useState(false);
+  const [showViewAdminDetails, setShowViewAdminDetails] = useState(false);
+  const [viewingAdmin, setViewingAdmin] = useState(null);
   const [editingAdmin, setEditingAdmin] = useState(null);
   const [searchTerm, setSearchTerm] = useState('');
   const [currentPage, setCurrentPage] = useState(1);
@@ -97,6 +100,11 @@ const AdminDashboard = ({ onLogout }) => {
       onConfirm: onLogout,
       type: 'info'
     });
+  };
+
+  const handleViewAdminClick = (admin) => {
+    setViewingAdmin(admin);
+    setShowViewAdminDetails(true);
   };
 
   const handleEditClick = (admin) => {
@@ -299,7 +307,12 @@ const AdminDashboard = ({ onLogout }) => {
                         {paginatedAdmins.map((admin) => (
                           <tr key={admin.id} className="border-b border-gray-100 hover:bg-gray-50 transition-colors">
                             <td className="pl-8 pr-6 py-4">
-                              <div className="text-sm text-gray-900">{admin.fullName}</div>
+                              <button
+                                onClick={() => handleViewAdminClick(admin)}
+                                className="text-sm text-blue-600 hover:text-blue-800 hover:underline transition-colors font-medium"
+                              >
+                                {admin.fullName}
+                              </button>
                             </td>
                             <td className="px-6 py-4">
                               <div className="text-sm text-gray-900">{admin.idNumber}</div>
@@ -398,6 +411,17 @@ const AdminDashboard = ({ onLogout }) => {
             setEditingAdmin(null);
           }}
           onSave={editingAdmin ? handleEditAdmin : handleAddAdmin}
+        />
+      )}
+
+      {/* View Admin Details Modal */}
+      {showViewAdminDetails && viewingAdmin && (
+        <ViewAdminDetails
+          admin={viewingAdmin}
+          onClose={() => {
+            setShowViewAdminDetails(false);
+            setViewingAdmin(null);
+          }}
         />
       )}
 

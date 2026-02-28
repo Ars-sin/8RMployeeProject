@@ -232,11 +232,14 @@ const BRMSystem = () => {
                       className={`w-full px-4 py-2.5 sm:py-3 pr-12 border-2 rounded-lg focus:outline-none focus:border-blue-500 transition-colors ${
                         errors.password ? 'border-red-500' : 'border-gray-300'
                       }`}
+                      style={{ WebkitTextSecurity: showPassword ? 'none' : 'disc' }}
+                      autoComplete="current-password"
                     />
                     <button
                       type="button"
                       onClick={() => setShowPassword(!showPassword)}
-                      className="absolute right-4 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                      className="absolute right-4 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600 z-10"
+                      tabIndex={-1}
                     >
                       {showPassword ? (
                         <EyeOff className="w-5 h-5" />

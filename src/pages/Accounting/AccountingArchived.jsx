@@ -1,5 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Search, RotateCcw, Trash2 } from 'lucide-react';
+import ConfirmationModal from '../../Components/ConfirmationModal';
+import ViewEmployeeDetails from '../HR/ViewEmployeeDetails';
 import { getEmployees, restoreEmployee, deleteEmployee, updateEmployee } from '../../services/employeeService';
 
 const AccountingArchived = ({ projects }) => {
@@ -10,7 +12,18 @@ const AccountingArchived = ({ projects }) => {
   const [selectedEmployee, setSelectedEmployee] = useState(null);
   const [selectedProjectId, setSelectedProjectId] = useState('');
   const [currentPage, setCurrentPage] = useState(1);
+  const [showViewEmployeeDetails, setShowViewEmployeeDetails] = useState(false);
+  const [viewingEmployee, setViewingEmployee] = useState(null);
   const itemsPerPage = 10;
+
+  // Confirmation modal states
+  const [confirmModal, setConfirmModal] = useState({
+    isOpen: false,
+    title: '',
+    message: '',
+    onConfirm: null,
+    type: 'danger'
+  });
 
   useEffect(() => {
     loadArchivedEmployees();
@@ -52,24 +65,33 @@ const AccountingArchived = ({ projects }) => {
       setShowRestoreModal(false);
       setSelectedEmployee(null);
       setSelectedProjectId('');
-      alert('Employee restored successfully!');
     } catch (error) {
       console.error('Error restoring employee:', error);
       alert('Failed to restore employee');
     }
   };
 
-  const handleDelete = async (employeeId) => {
-    if (window.confirm('Are you sure you want to permanently delete this employee? This action cannot be undone.')) {
-      try {
-        await deleteEmployee(employeeId);
-        await loadArchivedEmployees();
-        alert('Employee deleted successfully!');
-      } catch (error) {
-        console.error('Error deleting employee:', error);
-        alert('Failed to delete employee');
-      }
-    }
+  const handleDelete = async (employee) => {
+    setConfirmModal({
+      isOpen: true,
+      title: 'Permanently Delete Employee',
+      message: `⚠️ WARNING: This will permanently delete ${employee.fullName || 'this employee'} from the database. This action cannot be undone. Are you sure?`,
+      onConfirm: async () => {
+        try {
+          await deleteEmployee(employee.id);
+          await loadArchivedEmployees();
+        } catch (error) {
+          console.error('Error deleting employee:', error);
+          alert('Failed to delete employee');
+        }
+      },
+      type: 'danger'
+    });
+  };
+
+  const handleViewEmployeeClick = (employee) => {
+    setViewingEmployee(employee);
+    setShowViewEmployeeDetails(true);
   };
 
   const filteredEmployees = archivedEmployees.filter(emp => 
@@ -167,7 +189,12 @@ const AccountingArchived = ({ projects }) => {
                         <div className="text-sm text-gray-900">{employee.employmentId}</div>
                       </td>
                       <td className="px-6 py-4">
-                        <div className="text-sm text-gray-900">{employee.fullName}</div>
+                        <button
+                          onClick={() => handleViewEmployeeClick(employee)}
+                          className="text-sm font-medium text-blue-600 hover:text-blue-800 hover:underline transition-colors"
+                        >
+                          {employee.fullName}
+                        </button>
                       </td>
                       <td className="px-6 py-4">
                         <div className="text-sm text-gray-500">{employee.email}</div>
@@ -188,7 +215,7 @@ const AccountingArchived = ({ projects }) => {
                             <RotateCcw className="w-4 h-4 text-gray-500 hover:text-green-600" />
                           </button>
                           <button
-                            onClick={() => handleDelete(employee.id)}
+                            onClick={() => handleDelete(employee)}
                             className="p-1.5 hover:bg-red-50 rounded transition-colors"
                             title="Delete Permanently"
                           >
@@ -296,6 +323,27 @@ const AccountingArchived = ({ projects }) => {
             </div>
           </div>
         </div>
+      )}
+
+      {/* Confirmation Modal */}
+      <ConfirmationModal
+        isOpen={confirmModal.isOpen}
+        onClose={() => setConfirmModal({ ...confirmModal, isOpen: false })}
+        onConfirm={confirmModal.onConfirm}
+        title={confirmModal.title}
+        message={confirmModal.message}
+        type={confirmModal.type}
+      />
+
+      {/* View Employee Details Modal */}
+      {showViewEmployeeDetails && viewingEmployee && (
+        <ViewEmployeeDetails
+          employee={viewingEmployee}
+          onClose={() => {
+            setShowViewEmployeeDetails(false);
+            setViewingEmployee(null);
+          }}
+        />
       )}
     </div>
   );

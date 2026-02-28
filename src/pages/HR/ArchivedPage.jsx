@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Search, Filter, Download, RotateCcw, Trash2 } from 'lucide-react';
 import ConfirmationModal from '../../Components/ConfirmationModal';
+import ViewEmployeeDetails from './ViewEmployeeDetails';
 import { getEmployees, restoreEmployee, deleteEmployee } from '../../services/employeeService';
 
 const ArchivedPage = ({ onNavigate, projects }) => {
@@ -11,6 +12,8 @@ const ArchivedPage = ({ onNavigate, projects }) => {
   const [showRestoreModal, setShowRestoreModal] = useState(false);
   const [restoringEmployee, setRestoringEmployee] = useState(null);
   const [selectedProjectId, setSelectedProjectId] = useState('');
+  const [showViewEmployeeDetails, setShowViewEmployeeDetails] = useState(false);
+  const [viewingEmployee, setViewingEmployee] = useState(null);
 
   // Confirmation modal states
   const [confirmModal, setConfirmModal] = useState({
@@ -95,6 +98,11 @@ const ArchivedPage = ({ onNavigate, projects }) => {
       },
       type: 'danger'
     });
+  };
+
+  const handleViewEmployeeClick = (employee) => {
+    setViewingEmployee(employee);
+    setShowViewEmployeeDetails(true);
   };
 
   const handleExport = () => {
@@ -193,9 +201,12 @@ const ArchivedPage = ({ onNavigate, projects }) => {
                   <tr key={employee.id || index} className="border-b border-gray-100 hover:bg-gray-50 transition-colors">
                     <td className="px-6 py-4">
                       <div>
-                        <div className="text-sm text-gray-900 font-medium">
+                        <button
+                          onClick={() => handleViewEmployeeClick(employee)}
+                          className="text-sm text-blue-600 hover:text-blue-800 hover:underline transition-colors font-medium"
+                        >
                           {employee.fullName || employee.name || 'No Name'}
-                        </div>
+                        </button>
                       </div>
                     </td>
                     <td className="px-6 py-4">
@@ -330,6 +341,17 @@ const ArchivedPage = ({ onNavigate, projects }) => {
         message={confirmModal.message}
         type={confirmModal.type}
       />
+
+      {/* View Employee Details Modal */}
+      {showViewEmployeeDetails && viewingEmployee && (
+        <ViewEmployeeDetails
+          employee={viewingEmployee}
+          onClose={() => {
+            setShowViewEmployeeDetails(false);
+            setViewingEmployee(null);
+          }}
+        />
+      )}
     </div>
   );
 };

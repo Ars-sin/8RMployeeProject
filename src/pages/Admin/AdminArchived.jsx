@@ -1,5 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Search, Filter, Download, RotateCcw, Trash2 } from 'lucide-react';
+import ConfirmationModal from '../../Components/ConfirmationModal';
+import ViewAdminDetails from './ViewAdminDetails';
 import { getAdmins, restoreAdmin, deleteAdmin } from '../../services/adminService';
 
 const AdminArchived = () => {
@@ -7,6 +9,17 @@ const AdminArchived = () => {
   const [currentPage, setCurrentPage] = useState(1);
   const [archivedAdmins, setArchivedAdmins] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [showViewAdminDetails, setShowViewAdminDetails] = useState(false);
+  const [viewingAdmin, setViewingAdmin] = useState(null);
+
+  // Confirmation modal states
+  const [confirmModal, setConfirmModal] = useState({
+    isOpen: false,
+    title: '',
+    message: '',
+    onConfirm: null,
+    type: 'danger'
+  });
 
   // Load archived admins from Firebase
   useEffect(() => {
@@ -25,30 +38,45 @@ const AdminArchived = () => {
     loadArchivedAdmins();
   }, []);
 
-  const handleRestore = async (id) => {
-    if (window.confirm('Are you sure you want to restore this admin?')) {
-      try {
-        await restoreAdmin(id);
-        setArchivedAdmins(archivedAdmins.filter(admin => admin.id !== id));
-        alert('Admin restored successfully');
-      } catch (error) {
-        console.error('Error restoring admin:', error);
-        alert('Failed to restore admin. Please try again.');
-      }
-    }
+  const handleRestore = async (admin) => {
+    setConfirmModal({
+      isOpen: true,
+      title: 'Restore Admin',
+      message: `Are you sure you want to restore ${admin.fullName || 'this admin'}? They will be moved back to the active admins list.`,
+      onConfirm: async () => {
+        try {
+          await restoreAdmin(admin.id);
+          setArchivedAdmins(archivedAdmins.filter(a => a.id !== admin.id));
+        } catch (error) {
+          console.error('Error restoring admin:', error);
+          alert('Failed to restore admin. Please try again.');
+        }
+      },
+      type: 'info'
+    });
   };
 
-  const handlePermanentDelete = async (id) => {
-    if (window.confirm('⚠️ WARNING: This will permanently delete the admin from the database. This action cannot be undone. Are you sure?')) {
-      try {
-        await deleteAdmin(id);
-        setArchivedAdmins(archivedAdmins.filter(admin => admin.id !== id));
-        alert('Admin permanently deleted');
-      } catch (error) {
-        console.error('Error deleting admin:', error);
-        alert('Failed to delete admin. Please try again.');
-      }
-    }
+  const handlePermanentDelete = async (admin) => {
+    setConfirmModal({
+      isOpen: true,
+      title: 'Permanently Delete Admin',
+      message: `⚠️ WARNING: This will permanently delete ${admin.fullName || 'this admin'} from the database. This action cannot be undone. Are you sure?`,
+      onConfirm: async () => {
+        try {
+          await deleteAdmin(admin.id);
+          setArchivedAdmins(archivedAdmins.filter(a => a.id !== admin.id));
+        } catch (error) {
+          console.error('Error deleting admin:', error);
+          alert('Failed to delete admin. Please try again.');
+        }
+      },
+      type: 'danger'
+    });
+  };
+
+  const handleViewAdminClick = (admin) => {
+    setViewingAdmin(admin);
+    setShowViewAdminDetails(true);
   };
 
   const handleExport = () => {
@@ -149,9 +177,12 @@ const AdminArchived = () => {
                   {filteredAdmins.map((admin, index) => (
                     <tr key={admin.id || index} className="border-b border-gray-100 hover:bg-gray-50 transition-colors">
                       <td className="px-6 py-4">
-                        <div className="text-sm text-gray-900">
+                        <button
+                          onClick={() => handleViewAdminClick(admin)}
+                          className="text-sm text-blue-600 hover:text-blue-800 hover:underline transition-colors font-medium"
+                        >
                           {admin.fullName || 'No Name'}
-                        </div>
+                        </button>
                       </td>
                       <td className="px-6 py-4">
                         <div className="text-sm text-gray-900">
@@ -167,14 +198,14 @@ const AdminArchived = () => {
                       <td className="px-6 py-4">
                         <div className="flex items-center gap-3">
                           <button 
-                            onClick={() => handleRestore(admin.id)}
+                            onClick={() => handleRestore(admin)}
                             className="p-1.5 hover:bg-green-50 rounded transition-colors"
                             title="Restore Admin"
                           >
                             <RotateCcw className="w-4 h-4 text-gray-500 hover:text-green-600" />
                           </button>
                           <button 
-                            onClick={() => handlePermanentDelete(admin.id)}
+                            onClick={() => handlePermanentDelete(admin)}
                             className="p-1.5 hover:bg-red-50 rounded transition-colors"
                             title="Delete Permanently (Cannot be undone)"
                           >
@@ -223,6 +254,27 @@ const AdminArchived = () => {
           </div>
         </div>
       </main>
+
+      {/* Confirmation Modal */}
+      <ConfirmationModal
+        isOpen={confirmModal.isOpen}
+        onClose={() => setConfirmModal({ ...confirmModal, isOpen: false })}
+        onConfirm={confirmModal.onConfirm}
+        title={confirmModal.title}
+        message={confirmModal.message}
+        type={confirmModal.type}
+      />
+
+      {/* View Admin Details Modal */}
+      {showViewAdminDetails && viewingAdmin && (
+        <ViewAdminDetails
+          admin={viewingAdmin}
+          onClose={() => {
+            setShowViewAdminDetails(false);
+            setViewingAdmin(null);
+          }}
+        />
+      )}
     </>
   );
 };
